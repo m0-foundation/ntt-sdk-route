@@ -11,9 +11,21 @@ importers:
       '@wormhole-foundation/sdk-connect':
         specifier: ^1.5.2
         version: 1.5.2
+      '@wormhole-foundation/sdk-definitions-ntt':
+        specifier: ^0.6.1
+        version: 0.6.1(@wormhole-foundation/sdk-base@1.5.2)(@wormhole-foundation/sdk-definitions@1.5.2)
+      '@wormhole-foundation/sdk-evm':
+        specifier: ^1.5.2
+        version: 1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@wormhole-foundation/sdk-evm-ntt':
+        specifier: ^0.6.1
+        version: 0.6.1(@wormhole-foundation/sdk-base@1.5.2)(@wormhole-foundation/sdk-definitions@1.5.2)(@wormhole-foundation/sdk-evm-core@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-route-ntt':
         specifier: ^0.6.1
         version: 0.6.1(@wormhole-foundation/sdk-base@1.5.2)(@wormhole-foundation/sdk-connect@1.5.2)(@wormhole-foundation/sdk-definitions@1.5.2)(@wormhole-foundation/sdk-evm-core@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana-core@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.5.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)
+      ethers:
+        specifier: ^6.5.1
+        version: 6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     devDependencies:
       '@types/node':
         specifier: ~20.17.17
