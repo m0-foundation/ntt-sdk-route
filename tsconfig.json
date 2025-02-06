@@ -1,0 +1,20 @@
+{
+    "include": [
+        "src",
+        "*.config.ts"
+    ],
+    "exclude": [
+        "dist",
+        "node_modules"
+    ],
+    "compilerOptions": {
+        "types": [
+            "node"
+        ],
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true
+    }
+}

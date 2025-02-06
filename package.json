@@ -1,0 +1,35 @@
+{
+  "name": "@m0-foundation/ntt-sdk-route",
+  "version": "0.0.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "$npm_execpath tsup",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "~20.17.17",
+    "tsup": "~8.3.6",
+    "typescript": "~5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "pnpm@10.2.0",
+  "dependencies": {
+    "@wormhole-foundation/sdk-connect": "^1.5.2",
+    "@wormhole-foundation/sdk-route-ntt": "^0.6.1"
+  }
+}
