@@ -94,21 +94,50 @@ export class M0AutomaticRoute<N extends Network>
     ];
   }
 
-  static getContracts(network: Network): Contracts {
-    switch (network) {
-      case "Mainnet":
+  static getContracts(chain: Chain): Contracts {
+    switch (chain) {
+      case "Ethereum":
         return this.MAINNET_CONTRACTS;
-      case "Testnet":
-        return this.TESTNET_CONTRACTS;
+      case "Optimism":
+        return this.MAINNET_CONTRACTS;
+      case "Arbitrum":
+        return this.MAINNET_CONTRACTS;
+      case "Sepolia":
+        return {
+          token: "0x245902cAB620E32DF09DA4a26094064e096dd480",
+          wrappedMToken: "0xe91A93a2B782781744a07118bab5855fb256b881",
+          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
+          transceiver: {
+            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
+          },
+        };
+      case "OptimismSepolia":
+        return {
+          token: "0x58582438ab47FfA2206570AC93E85B42640bef09",
+          wrappedMToken: "0x71c72Ee9F587DAC1df749940c7581E4BbC789F85",
+          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
+          transceiver: {
+            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
+          },
+        };
+      case "ArbitrumSepolia":
+        return {
+          token: "0x58582438ab47FfA2206570AC93E85B42640bef09",
+          wrappedMToken: "0x71c72Ee9F587DAC1df749940c7581E4BbC789F85",
+          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
+          transceiver: {
+            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
+          },
+        };
       default:
-        throw new Error(`Unsupported network: ${network}`);
+        throw new Error(`Unsupported chain: ${chain}`);
     }
   }
 
   static async supportedSourceTokens(
     fromChain: ChainContext<Network>
   ): Promise<TokenId[]> {
-    const { token, wrappedMToken } = this.getContracts(fromChain.network);
+    const { token, wrappedMToken } = this.getContracts(fromChain.chain);
     return [
       Wormhole.tokenId(fromChain.chain, token),
       Wormhole.tokenId(fromChain.chain, wrappedMToken),
@@ -120,7 +149,7 @@ export class M0AutomaticRoute<N extends Network>
     fromChain: ChainContext<N>,
     toChain: ChainContext<N>
   ): Promise<TokenId[]> {
-    const { token: mToken, wrappedMToken } = this.getContracts(toChain.network);
+    const { token: mToken, wrappedMToken } = this.getContracts(toChain.chain);
     return [
       Wormhole.tokenId(toChain.chain, mToken),
       Wormhole.tokenId(toChain.chain, wrappedMToken),
@@ -139,7 +168,7 @@ export class M0AutomaticRoute<N extends Network>
 
   async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
     const ntt = await request.fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(request.fromChain.network),
+      ntt: M0AutomaticRoute.getContracts(request.fromChain.chain)
     });
 
     return ntt.isRelayingAvailable(request.toChain.chain);
@@ -163,7 +192,7 @@ export class M0AutomaticRoute<N extends Network>
       request.destination.decimals
     );
 
-    const contracts = M0AutomaticRoute.getContracts(request.fromChain.network);
+    const contracts = M0AutomaticRoute.getContracts(request.fromChain.chain);
 
     const validatedParams: Vp = {
       amount: params.amount,
@@ -188,7 +217,7 @@ export class M0AutomaticRoute<N extends Network>
   ): Promise<QR> {
     const { fromChain, toChain } = request;
     const ntt = await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.network),
+      ntt: M0AutomaticRoute.getContracts(fromChain.chain)
     });
 
     if (!(await ntt.isRelayingAvailable(toChain.chain))) {
@@ -223,7 +252,7 @@ export class M0AutomaticRoute<N extends Network>
         token: Wormhole.tokenId(fromChain.chain, "native"),
         amount: amount.fromBaseUnits(
           deliveryPrice,
-          fromChain.config.nativeTokenDecimals
+          fromChain.config.nativeTokenDecimals,
         ),
       },
       destinationNativeGas: amount.fromBaseUnits(
@@ -250,7 +279,7 @@ export class M0AutomaticRoute<N extends Network>
       throw new Error("The route supports only EVM");
 
     const ntt = (await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.network),
+      ntt: M0AutomaticRoute.getContracts(fromChain.chain)
     })) as EvmNtt<N, EvmChains>;
 
     const sourceTokenAddress = params.normalizedParams.sourceContracts.token;
@@ -386,7 +415,7 @@ export class M0AutomaticRoute<N extends Network>
 
     const toChain = this.wh.getChain(receipt.to);
     const ntt = await toChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(toChain.network),
+      ntt: M0AutomaticRoute.getContracts(toChain.chain)
     });
 
     if (isAttested(receipt)) {
