@@ -13,6 +13,7 @@ import {
   Wormhole,
   WormholeMessageId,
   amount,
+  canonicalAddress,
   chainToPlatform,
   finality,
   isAttested,
@@ -278,9 +279,8 @@ export class M0AutomaticRoute<N extends Network>
       ntt: M0AutomaticRoute.getContracts(fromChain.chain),
     })) as EvmNtt<N, EvmChains>;
 
-    const sourceTokenAddress = params.normalizedParams.sourceContracts.token;
-    const destinationTokenAddress =
-      params.normalizedParams.destinationContracts.token;
+    const sourceTokenAddress = canonicalAddress(request.source.id);
+    const destinationTokenAddress = canonicalAddress(request.destination.id);
 
     const initXfer = this.transferMLike(
       ntt,
@@ -323,7 +323,7 @@ export class M0AutomaticRoute<N extends Network>
     //TODO check for ERC-2612 (permit) support on token?
     const tokenContract = EvmPlatform.getTokenImplementation(
       ntt.provider,
-      ntt.tokenAddress
+      sourceToken
     );
 
     const allowance = await tokenContract.allowance(
