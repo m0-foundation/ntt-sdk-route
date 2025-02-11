@@ -76,15 +76,15 @@ export class M0AutomaticRoute<N extends Network>
     return ["Mainnet", "Testnet"];
   }
 
-  static supportedChains(): Chain[] {
-    return [
-      "Ethereum",
-      "Arbitrum",
-      "Optimism",
-      "Sepolia",
-      "ArbitrumSepolia",
-      "OptimismSepolia",
-    ];
+  static supportedChains(network: Network): Chain[] {
+    switch (network) {
+      case "Mainnet":
+        return ["Ethereum", "Arbitrum", "Optimism"];
+      case "Testnet":
+        return ["Sepolia", "ArbitrumSepolia", "OptimismSepolia"];
+      default:
+        throw new Error(`Unsupported network: ${network}`);
+    }
   }
 
   static getContracts(chain: Chain): Contracts {
@@ -411,9 +411,9 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     const toChain = this.wh.getChain(receipt.to);
-    const ntt = await toChain.getProtocol("Ntt", {
+    const ntt = (await toChain.getProtocol("Ntt", {
       ntt: M0AutomaticRoute.getContracts(toChain.chain),
-    });
+    })) as EvmNtt<N, EvmChains>;
 
     if (isAttested(receipt)) {
       const {
@@ -435,7 +435,14 @@ export class M0AutomaticRoute<N extends Network>
         attestation: { attestation: vaa },
       } = receipt;
 
-      if (await ntt.getIsExecuted(vaa)) {
+      const payload =
+        vaa.payloadName === "WormholeTransfer"
+          ? vaa.payload
+          : vaa.payload["payload"];
+      const isExecuted = await ntt.manager.isMessageExecuted(
+        Ntt.messageDigest(vaa.emitterChain, payload["nttManagerPayload"])
+      );
+      if (isExecuted) {
         receipt = {
           ...receipt,
           state: TransferState.DestinationFinalized,
