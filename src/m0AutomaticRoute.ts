@@ -22,6 +22,7 @@ import {
   routes,
   signSendWait,
   toChainId,
+  toUniversal,
   universalAddress,
 } from "@wormhole-foundation/sdk-connect";
 import "@wormhole-foundation/sdk-definitions-ntt";
@@ -35,7 +36,7 @@ import {
   EvmUnsignedTransaction,
 } from "@wormhole-foundation/sdk-evm";
 import { NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { TransactionRequest } from "ethers";
+import { Contract, TransactionRequest } from "ethers";
 import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
 
 type Op = NttRoute.Options;
@@ -69,15 +70,7 @@ export class M0AutomaticRoute<N extends Network>
     transceiver: { wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841" },
   };
 
-  // TODO: add testnet info
-  static TESTNET_CONTRACTS: Contracts = {
-    token: "",
-    wrappedMToken: "",
-    manager: "",
-    transceiver: { wormhole: "" },
-  };
-
-  static meta = { name: "M0AutomaticNtt" };
+  static meta = { name: "M0AutomaticRoute" };
 
   static supportedNetworks(): Network[] {
     return ["Mainnet", "Testnet"];
@@ -168,7 +161,7 @@ export class M0AutomaticRoute<N extends Network>
 
   async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
     const ntt = await request.fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(request.fromChain.chain)
+      ntt: M0AutomaticRoute.getContracts(request.fromChain.chain),
     });
 
     return ntt.isRelayingAvailable(request.toChain.chain);
@@ -192,14 +185,17 @@ export class M0AutomaticRoute<N extends Network>
       request.destination.decimals
     );
 
-    const contracts = M0AutomaticRoute.getContracts(request.fromChain.chain);
+    const fromContracts = M0AutomaticRoute.getContracts(
+      request.fromChain.chain
+    );
+    const toContracts = M0AutomaticRoute.getContracts(request.toChain.chain);
 
     const validatedParams: Vp = {
       amount: params.amount,
       normalizedParams: {
         amount: trimmedAmount,
-        sourceContracts: contracts,
-        destinationContracts: contracts,
+        sourceContracts: fromContracts,
+        destinationContracts: toContracts,
         options: {
           queue: false,
           automatic: true,
@@ -217,7 +213,7 @@ export class M0AutomaticRoute<N extends Network>
   ): Promise<QR> {
     const { fromChain, toChain } = request;
     const ntt = await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.chain)
+      ntt: M0AutomaticRoute.getContracts(fromChain.chain),
     });
 
     if (!(await ntt.isRelayingAvailable(toChain.chain))) {
@@ -252,7 +248,7 @@ export class M0AutomaticRoute<N extends Network>
         token: Wormhole.tokenId(fromChain.chain, "native"),
         amount: amount.fromBaseUnits(
           deliveryPrice,
-          fromChain.config.nativeTokenDecimals,
+          fromChain.config.nativeTokenDecimals
         ),
       },
       destinationNativeGas: amount.fromBaseUnits(
@@ -279,12 +275,12 @@ export class M0AutomaticRoute<N extends Network>
       throw new Error("The route supports only EVM");
 
     const ntt = (await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.chain)
+      ntt: M0AutomaticRoute.getContracts(fromChain.chain),
     })) as EvmNtt<N, EvmChains>;
 
     const sourceTokenAddress = params.normalizedParams.sourceContracts.token;
     const destinationTokenAddress =
-      params.normalizedParams.sourceContracts.token;
+      params.normalizedParams.destinationContracts.token;
 
     const initXfer = this.transferMLike(
       ntt,
@@ -348,15 +344,16 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     const receiver = universalAddress(destination);
-    const txReq = await ntt.manager
-      .getFunction(
-        "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress) external payable returns (uint64 sequence)"
-      )
+    const contract = new Contract(ntt.managerAddress, [
+      "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress) external payable returns (uint64 sequence)",
+    ]);
+    const txReq = await contract
+      .getFunction("transferMLikeToken")
       .populateTransaction(
         amount,
         sourceToken,
         toChainId(destination.chain),
-        destinationToken,
+        toUniversal(destination.chain, destinationToken).toString(),
         receiver,
         receiver,
         { value: totalPrice }
@@ -415,7 +412,7 @@ export class M0AutomaticRoute<N extends Network>
 
     const toChain = this.wh.getChain(receipt.to);
     const ntt = await toChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(toChain.chain)
+      ntt: M0AutomaticRoute.getContracts(toChain.chain),
     });
 
     if (isAttested(receipt)) {
