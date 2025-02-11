@@ -9,16 +9,13 @@ import {
     RedeemedTransferReceipt,
     Signer,
     TokenId,
-    TransactionId,
     TransferState,
     Wormhole,
     WormholeMessageId,
     amount,
-    canonicalAddress,
     chainToPlatform,
     finality,
     isAttested,
-    isDestinationQueued,
     isRedeemed,
     isSourceFinalized,
     isSourceInitiated,
@@ -29,7 +26,7 @@ import {
   } from "@wormhole-foundation/sdk-connect";
   import "@wormhole-foundation/sdk-definitions-ntt";
 import { EvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
-import { addFrom, EvmAddress, EvmChains, EvmPlatform, EvmUnsignedTransaction } from "@wormhole-foundation/sdk-evm";
+import { addChainId, addFrom, EvmAddress, EvmChains, EvmPlatform, EvmUnsignedTransaction } from "@wormhole-foundation/sdk-evm";
 import { NttRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { TransactionRequest } from "ethers";
 import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
@@ -43,13 +40,6 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
   type Q = routes.Quote<Op, Vp>;
   
   type R = NttRoute.AutomaticTransferReceipt;
-  
-  export function nttAutomaticRoute(config: NttRoute.Config) {
-    class NttRouteImpl<N extends Network> extends M0AutomaticRoute<N> {
-      static override config = config;
-    }
-    return NttRouteImpl;
-  }
   
   export class M0AutomaticRoute<N extends Network>
     extends routes.AutomaticRoute<N, Op, Vp, R>
@@ -77,19 +67,13 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         transceiver: { wormhole: this.WORMHOLE_TRANSCEIVER },
     };
   
-    // @ts-ignore
-    // Since we set the config on the static class, access it with this param
-    // the NttManualRoute.config will always be empty
-    readonly staticConfig = this.constructor.config;
-    static config: NttRoute.Config = { tokens: {} };
-  
-    static meta = { name: "M0 AutomaticNtt" };
+    static meta = { name: "M0AutomaticNtt" };
   
     static supportedNetworks(): Network[] {
       return ["Mainnet"];
     }
   
-    static supportedChains(network: Network): Chain[] {
+    static supportedChains(): Chain[] {
       return ["Ethereum", "Arbitrum", "Optimism"];
     }
   
@@ -103,8 +87,6 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
     }
   
     static async supportedDestinationTokens<N extends Network>(
-      sourceToken: TokenId,
-      fromChain: ChainContext<N>,
       toChain: ChainContext<N>
     ): Promise<TokenId[]> {
         return [ 
@@ -124,13 +106,8 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
     }
   
     async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
-      const nttContracts = NttRoute.resolveNttContracts(
-        this.staticConfig,
-        request.source.id
-      );
-  
       const ntt = await request.fromChain.getProtocol("Ntt", {
-        ntt: nttContracts,
+        ntt: M0AutomaticRoute.NTT_CONTRACTS,
       });
   
       return ntt.isRelayingAvailable(request.toChain.chain);
@@ -158,14 +135,8 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         amount: params.amount,
         normalizedParams: {
           amount: trimmedAmount,
-          sourceContracts: NttRoute.resolveNttContracts(
-            this.staticConfig,
-            request.source.id
-          ),
-          destinationContracts: NttRoute.resolveNttContracts(
-            this.staticConfig,
-            request.destination.id
-          ),
+          sourceContracts: M0AutomaticRoute.NTT_CONTRACTS,
+          destinationContracts: M0AutomaticRoute.NTT_CONTRACTS,
           options: {
             queue: false,
             automatic: true,
@@ -183,7 +154,7 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
     ): Promise<QR> {
       const { fromChain, toChain } = request;
       const ntt = await fromChain.getProtocol("Ntt", {
-        ntt: params.normalizedParams.sourceContracts,
+        ntt: M0AutomaticRoute.NTT_CONTRACTS,
       });
   
       if (!(await ntt.isRelayingAvailable(toChain.chain))) {
@@ -227,23 +198,7 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         ),
         eta: finality.estimateFinalityTime(request.fromChain.chain),
       };
-      const dstNtt = await toChain.getProtocol("Ntt", {
-        ntt: params.normalizedParams.destinationContracts,
-      });
-      const duration = await dstNtt.getRateLimitDuration();
-      if (duration > 0n) {
-        const capacity = await dstNtt.getCurrentInboundCapacity(fromChain.chain);
-        if (
-          NttRoute.isCapacityThresholdExceeded(amount.units(dstAmount), capacity)
-        ) {
-          result.warnings = [
-            {
-              type: "DestinationCapacityWarning",
-              delayDurationSec: Number(duration),
-            },
-          ];
-        }
-      }
+
       return result;
     }
   
@@ -254,7 +209,7 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         to: ChainAddress
     ): Promise<R> {
         const { params } = quote;
-        const { fromChain, toChain } = request;
+        const { fromChain } = request;
         const sender = Wormhole.parseAddress(signer.chain(), signer.address());
     
         if (chainToPlatform(fromChain.chain) !== 'Evm')
@@ -358,87 +313,6 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         );
     }
   
-    async resume(tx: TransactionId): Promise<R> {
-      const vaa = await this.wh.getVaa(
-        tx.txid,
-        "Ntt:WormholeTransferStandardRelayer"
-      );
-      if (!vaa) throw new Error("No VAA found for transaction: " + tx.txid);
-  
-      const msgId: WormholeMessageId = {
-        chain: vaa.emitterChain,
-        emitter: vaa.emitterAddress,
-        sequence: vaa.sequence,
-      };
-  
-      const { payload } = vaa.payload;
-      const { recipientChain, trimmedAmount } =
-        payload["nttManagerPayload"].payload;
-  
-      const token = canonicalAddress({
-        chain: vaa.emitterChain,
-        address: payload["nttManagerPayload"].payload.sourceToken,
-      });
-      const manager = canonicalAddress({
-        chain: vaa.emitterChain,
-        address: payload["sourceNttManager"],
-      });
-      const whTransceiver =
-        vaa.emitterChain === "Solana"
-          ? manager
-          : canonicalAddress({
-              chain: vaa.emitterChain,
-              address: vaa.emitterAddress,
-            });
-  
-      const dstInfo = NttRoute.resolveDestinationNttContracts(
-        this.staticConfig,
-        {
-          chain: vaa.emitterChain,
-          address: payload["sourceNttManager"],
-        },
-        recipientChain
-      );
-  
-      const amt = amount.fromBaseUnits(
-        trimmedAmount.amount,
-        trimmedAmount.decimals
-      );
-  
-      return {
-        from: vaa.emitterChain,
-        to: recipientChain,
-        state: TransferState.Attested,
-        originTxs: [tx],
-        attestation: {
-          id: msgId,
-          attestation: vaa,
-        },
-        params: {
-          amount: amount.display(amt),
-          options: { automatic: true },
-          normalizedParams: {
-            amount: amt,
-            options: { queue: false, automatic: true },
-            sourceContracts: {
-              token,
-              manager,
-              transceiver: {
-                wormhole: whTransceiver,
-              },
-            },
-            destinationContracts: {
-              token: dstInfo.token,
-              manager: dstInfo.manager,
-              transceiver: {
-                wormhole: dstInfo.transceiver["wormhole"]!,
-              },
-            },
-          },
-        },
-      };
-    }
-  
     public override async *track(receipt: R, timeout?: number) {
       if (isSourceInitiated(receipt) || isSourceFinalized(receipt)) {
         const { txid } = receipt.originTxs[receipt.originTxs.length - 1]!;
@@ -474,7 +348,7 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
   
       const toChain = this.wh.getChain(receipt.to);
       const ntt = await toChain.getProtocol("Ntt", {
-        ntt: receipt.params.normalizedParams.destinationContracts,
+        ntt: M0AutomaticRoute.NTT_CONTRACTS
       });
   
       if (isAttested(receipt)) {
@@ -492,16 +366,11 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
         }
       }
   
-      if (isRedeemed(receipt) || isDestinationQueued(receipt)) {
+      if (isRedeemed(receipt)) {
         const {
           attestation: { attestation: vaa },
         } = receipt;
   
-        const payload =
-          vaa.payloadName === "WormholeTransfer"
-            ? vaa.payload
-            : vaa.payload["payload"];
-
         if (await ntt.getIsExecuted(vaa)) {
           receipt = {
             ...receipt,
@@ -514,9 +383,4 @@ import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
       yield receipt;
     }
   }
-  
-
-function addChainId(txReq: TransactionRequest, chainId: bigint): TransactionRequest {
-    throw new Error("Function not implemented.");
-}
   
