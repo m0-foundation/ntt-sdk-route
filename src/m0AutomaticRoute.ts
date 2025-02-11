@@ -35,8 +35,8 @@ import {
   EvmUnsignedTransaction,
 } from "@wormhole-foundation/sdk-evm";
 import { NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { N, TransactionRequest } from "ethers";
-import { Ntt, transceiverInfo } from "@wormhole-foundation/sdk-definitions-ntt";
+import { TransactionRequest } from "ethers";
+import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
