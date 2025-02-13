@@ -71,7 +71,7 @@ export class M0AutomaticRoute<N extends Network>
     transceiver: { wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841" },
   };
 
-  static meta = { name: "M0AutomaticRoute" };
+  static meta = { name: "M0AutomaticRoute", provider: "M^0" };
 
   static supportedNetworks(): Network[] {
     return ["Mainnet", "Testnet"];
