@@ -1,25 +1,35 @@
-import { Chain, ChainContext, Network, Wormhole, canonicalAddress, routes, wormhole } from "@wormhole-foundation/sdk";
-
-import evm from "@wormhole-foundation/sdk/evm";
-// import solana from "@wormhole-foundation/sdk/solana";
-import { Signer, Wallet, JsonRpcProvider} from 'ethers';
+import { Chain, ChainAddress, ChainContext, Network, Signer, Wormhole, canonicalAddress, routes, wormhole } from "@wormhole-foundation/sdk";
+import evm from "@wormhole-foundation/sdk/platforms/evm";
+import '@wormhole-foundation/sdk-definitions-ntt';
+import '@wormhole-foundation/sdk-evm-ntt';
+import evmLoader from "@wormhole-foundation/sdk/evm";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
 import 'dotenv/config'
 
+export interface SignerStuff<N extends Network, C extends Chain> {
+  chain: ChainContext<N, C>;
+  signer: Signer<N, C>;
+  address: ChainAddress<C>;
+}
+
 async function getSigner<N extends Network, C extends Chain>(
     chain: ChainContext<N, C>,
-  ): Promise<Signer> {
-    if (process.env.PRIVATE_KEY == null)
-        throw new Error("PRIVATE_KEY is not set");
-    if (process.env.RPC_URL == null)
-        throw new Error("RPC_URL is not set");
-    return new Wallet(process.env.PRIVATE_KEY, new JsonRpcProvider(process.env.RPC_URL));
+  ): Promise<SignerStuff<N, C>> {
+    const signer = await evm.getSigner(
+      await chain.getRpc(),
+      process.env.PRIVATE_KEY!
+    );
+ 
+    return {
+      chain,
+      signer: signer as Signer<N, C>,
+      address: Wormhole.chainAddress(chain.chain, signer.address()),
+    };
   }
 
 (async function () {
   // Setup
-  const wh = await wormhole("Testnet", [evm]);
-
+  const wh = await wormhole("Testnet", [evmLoader]);
   
   const src = wh.getChain("Sepolia");
   const dst = wh.getChain("OptimismSepolia");
@@ -89,9 +99,11 @@ async function getSigner<N extends Network, C extends Chain>(
   // Fetch quote for the transfer
   // this, too, returns a new type that must be passed to the next step (if you like the quote)
   const quote = await bestRoute.quote(tr, validated.params);
-  //if (!quote.success) throw quote.error;
-  //console.log("Quote for transfer: ", quote);
-/*
+  if (!quote.success) throw quote.error;
+  console.log("Quote for transfer: ", quote);
+  console.log("SourceToken: ", quote.sourceToken.token.address);
+  console.log("DestToken: ", quote.destinationToken.token.address);
+
   // Now the transfer may be initiated
   // A receipt will be returned, guess what you gotta do with that?
   const receipt = await bestRoute.initiate(
@@ -106,5 +118,5 @@ async function getSigner<N extends Network, C extends Chain>(
   // If there is an opportunity to advance it to the next step, it will take it
   // ie complete or finalize
   // see the implementation for how this works
-  await routes.checkAndCompleteTransfer(bestRoute, receipt, dstSigner.signer);*/
+  await routes.checkAndCompleteTransfer(bestRoute, receipt, dstSigner.signer);
 })();
