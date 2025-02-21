@@ -9,6 +9,11 @@
     },
     "./package.json": "./package.json"
   },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/m0-foundation/ntt-sdk-route.git"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
