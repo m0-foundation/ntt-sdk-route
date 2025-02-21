@@ -83,5 +83,5 @@ jobs:
           publish: pnpm release:publish
           title: "🚀 Version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN_PUBLISHER }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN_PUBLISHER }}
+          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.CHANGESETS_NPM_TOKEN }}
