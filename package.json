@@ -20,6 +20,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.28.1",
     "@types/node": "~20.17.17",
     "tsup": "~8.3.6",
     "typescript": "~5.6.3"
