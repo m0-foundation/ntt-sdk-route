@@ -17,6 +17,10 @@ on:
 env:
   NPM_TOKEN: ""
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     name: Build

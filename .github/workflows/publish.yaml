@@ -14,6 +14,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 # We'll default the NPM_TOKEN to an empty value since we use it
 # in .npmrc file and if undefined, the node setup would fail
 env:
