@@ -60,7 +60,7 @@ export class M0AutomaticRoute<N extends Network>
   static NATIVE_GAS_DROPOFF_SUPPORTED: boolean = false;
 
   // Contract addresses are the same on all EVM chains
-  static MAINNET_CONTRACTS: Contracts = {
+  static EVM_CONTRACTS: Contracts = {
     // M token address is the same on EVM chains
     token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
     // Wrapped M token address is the same on EVM chains
@@ -91,38 +91,17 @@ export class M0AutomaticRoute<N extends Network>
   static getContracts(chain: Chain): Contracts {
     switch (chain) {
       case "Ethereum":
-        return this.MAINNET_CONTRACTS;
+        return this.EVM_CONTRACTS;
       case "Optimism":
-        return this.MAINNET_CONTRACTS;
+        return this.EVM_CONTRACTS;
       case "Arbitrum":
-        return this.MAINNET_CONTRACTS;
+        return this.EVM_CONTRACTS;
       case "Sepolia":
-        return {
-          token: "0x245902cAB620E32DF09DA4a26094064e096dd480",
-          wrappedMToken: "0xe91A93a2B782781744a07118bab5855fb256b881",
-          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
-          transceiver: {
-            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
-          },
-        };
+        return this.EVM_CONTRACTS;
       case "OptimismSepolia":
-        return {
-          token: "0x58582438ab47FfA2206570AC93E85B42640bef09",
-          wrappedMToken: "0x71c72Ee9F587DAC1df749940c7581E4BbC789F85",
-          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
-          transceiver: {
-            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
-          },
-        };
+        return this.EVM_CONTRACTS;
       case "ArbitrumSepolia":
-        return {
-          token: "0x58582438ab47FfA2206570AC93E85B42640bef09",
-          wrappedMToken: "0x71c72Ee9F587DAC1df749940c7581E4BbC789F85",
-          manager: "0xf1669804140fA31cdAA805A1B3Be91e6282D5e41",
-          transceiver: {
-            wormhole: "0xb1725758f7255B025cdbF2814Bc428B403623562",
-          },
-        };
+        return this.EVM_CONTRACTS;
       default:
         throw new Error(`Unsupported chain: ${chain}`);
     }
