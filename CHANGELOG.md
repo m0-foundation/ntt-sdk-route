@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.2
+
+### Patch Changes
+
+- f8e8290: Make package public
+
 ## 0.0.1
 
 ### Patch Changes
