@@ -2,17 +2,15 @@
 #  / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ / / \ \ / / \ \ / / \
 # `-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-'   `-`-'   `-`-'
 #
-#         Reusable workflow that builds the code and publishes the packages
+#                       Reusable workflow that builds the code
 #
 #   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-  .-.-.   .-.-.   .-.-
 #  / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ / / \ \ / / \ \ / / \
 # `-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-'   `-`-'   `-`-'
-name: Publish packages
+name: Test code
 
 on:
-  push:
-    branches:
-      - main
+  push
 
 # We'll default the NPM_TOKEN to an empty value since we use it
 # in .npmrc file and if undefined, the node setup would fail
@@ -57,24 +55,3 @@ jobs:
         run: pnpm build
         env:
           NODE_ENV: production
-
-      # This step uses the changesets CLI to bump the package versions and/or publish the unpublished packages
-      #
-      # How this works is:
-      #
-      # - If there are any changesets (markdown files in the .changeset directory),
-      #   changesets CLI will bump the package versions according to the bumps specified in the markdown files.
-      #
-      # - A PR is created containing these version bumps and with the changeset markdowns deleted
-      #
-      # - Once this PR is merged, this workflow kicks in again and this time checks
-      #   whether there is anything that needs to be published
-      - name: Publish packages / create version bump PRs
-        uses: changesets/action@v1
-        with:
-          version: pnpm release:version
-          publish: pnpm release:publish
-          title: "🚀 Version packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.CHANGESETS_GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.CHANGESETS_NPM_TOKEN }}
