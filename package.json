@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "$npm_execpath tsup",
+    "build": "$npm_execpath tsup --clean",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
