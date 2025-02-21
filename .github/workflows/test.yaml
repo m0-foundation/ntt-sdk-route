@@ -19,7 +19,7 @@ env:
 
 jobs:
   publish:
-    name: Publish
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
