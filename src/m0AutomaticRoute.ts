@@ -18,6 +18,7 @@ import {
   finality,
   isAttested,
   isRedeemed,
+  isSameToken,
   isSourceFinalized,
   isSourceInitiated,
   routes,
@@ -122,6 +123,11 @@ export class M0AutomaticRoute<N extends Network>
     fromChain: ChainContext<N>,
     toChain: ChainContext<N>
   ): Promise<TokenId[]> {
+    const sourceTokens = await this.supportedSourceTokens(fromChain);
+    if (!sourceTokens.some((t) => isSameToken(t, token))) {
+      return [];
+    }
+
     const { token: mToken, wrappedMToken } = this.getContracts(toChain.chain);
     return [
       Wormhole.tokenId(toChain.chain, mToken),
