@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.4
+
+### Patch Changes
+
+- 85688fd: Check source token in supportedDestinationTokens
+
 ## 0.0.3
 
 ### Patch Changes
