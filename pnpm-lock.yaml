@@ -15,17 +15,17 @@ importers:
         specifier: ^1.7.0
         version: 1.7.0
       '@wormhole-foundation/sdk-definitions-ntt':
-        specifier: ^0.6.1
-        version: 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
+        specifier: ^0.7.1
+        version: 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
       '@wormhole-foundation/sdk-evm':
         specifier: ^1.7.0
         version: 1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-evm-ntt':
-        specifier: ^0.6.1
-        version: 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+        specifier: ^0.7.1
+        version: 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-route-ntt':
-        specifier: ^0.6.1
-        version: 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-connect@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)
+        specifier: ^0.7.1
+        version: 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-connect@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)
       ethers:
         specifier: ^6.5.1
         version: 6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -894,8 +894,8 @@ packages:
     resolution: {integrity: sha512-qx30bE809eCksmuEXPysX21d4kfqc0SYF1dw9zLZrdkqr5Swegl2SVk+TVC6vzs8RIx/r85a04rZyUKib+sPkg==}
     engines: {node: '>=16'}
 
-  '@wormhole-foundation/sdk-definitions-ntt@0.6.1':
-    resolution: {integrity: sha512-OVaskp2xFv/y9qloVuTA5xXwDErKBREQkN8mrFYNG9vsI5r/wzItkPt0/RzGBtClT7beWt3ZfLOULzSpi6ktyw==}
+  '@wormhole-foundation/sdk-definitions-ntt@0.7.1':
+    resolution: {integrity: sha512-J++b8RMJU5dmroHEEPxV+Eu+Bn6SLUn/6U/8Y5D4yxW1GcBy8oDYtgeaHOUffPMV762N+tK8YfywhdLvs1lJKw==}
     peerDependencies:
       '@wormhole-foundation/sdk-base': ^1.0.0
       '@wormhole-foundation/sdk-definitions': ^1.0.0
@@ -911,8 +911,8 @@ packages:
     resolution: {integrity: sha512-xmqVXmT18Wo0OWQ3HW9rmk8xn5jNRT36lksYUd9vQgXD4Hq9eaQcw/yxNFTT8SfVmUfpuWu5M7+Gw+9ISasCSg==}
     engines: {node: '>=16'}
 
-  '@wormhole-foundation/sdk-evm-ntt@0.6.1':
-    resolution: {integrity: sha512-PT/05wur6iRGfmfy52QQb7NSoNtvhQ31DVtSl19ugYBGHM6rccAs+QstihwyQ1AfX2CNzOoxGschIQ2Q06CD+w==}
+  '@wormhole-foundation/sdk-evm-ntt@0.7.1':
+    resolution: {integrity: sha512-6Q+IfIcneGUz2y0140wBYle49jidC5TDtWy81qYzzFOTFaaP6YETapF1LMubZIGa+BFpzHTaCnBc0XLqcJ7Fcg==}
     engines: {node: '>=16'}
     peerDependencies:
       '@wormhole-foundation/sdk-base': ^1.0.0
@@ -932,8 +932,8 @@ packages:
     resolution: {integrity: sha512-W9UBLOJ20yYu2CQjNxlzIkc2Cd3TU66sw5Nx4vzORn2ltLjpB+7UnsuSDtwXwaHG2nQxU/DYnYfMG3Y50QBixg==}
     engines: {node: '>=16'}
 
-  '@wormhole-foundation/sdk-route-ntt@0.6.1':
-    resolution: {integrity: sha512-nR/m7l9PePz9Dk7kXAosS+ei9SCXK0aqsSvyxm4wNwnxoCNU2OotwkPVmaIbAyr1BkZ1J2ii921sOTTWcInILg==}
+  '@wormhole-foundation/sdk-route-ntt@0.7.1':
+    resolution: {integrity: sha512-Whof2QU08g8I8qGYqSnHJz9jgAn0wTgo3a7uOCDOLWDaoODXRj0r3bSQV/2XoPtZ32U9OcSICVaq2d+hSxKJmg==}
     engines: {node: '>=16'}
     peerDependencies:
       '@wormhole-foundation/sdk-connect': ^1.0.0
@@ -946,8 +946,8 @@ packages:
     resolution: {integrity: sha512-Mb214Gc2CPxzOjaZ/SSrl0YgcHDMtxOqYf9KpYRp54AwMpOhZvCk0DWcDyYK2XQNl+Mmv8atg4ZxTwWVfPlmlw==}
     engines: {node: '>=16'}
 
-  '@wormhole-foundation/sdk-solana-ntt@0.6.1':
-    resolution: {integrity: sha512-YSumolkZ9wKGvRLOzB12u+RgAzC4Yg1gzN2dUvdngWLsGeikfnDCGOz5fBqAdM5M5nK3ECHDShw8fnfTqNQaGQ==}
+  '@wormhole-foundation/sdk-solana-ntt@0.7.1':
+    resolution: {integrity: sha512-odb++rQpLocPqyPQYQXqliPEh4UAqADTm1qZkS2rM//zwqox6S2ybJC8OglDwDmr3+ae5kniylhvdH5KmE8kgA==}
     engines: {node: '>=16'}
     peerDependencies:
       '@wormhole-foundation/sdk-base': ^1.0.0
@@ -3139,7 +3139,7 @@ snapshots:
       - subscriptions-transport-ws
       - utf-8-validate
 
-  '@wormhole-foundation/sdk-definitions-ntt@0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)':
+  '@wormhole-foundation/sdk-definitions-ntt@0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)':
     dependencies:
       '@wormhole-foundation/sdk-base': 1.7.0
       '@wormhole-foundation/sdk-definitions': 1.7.0
@@ -3170,11 +3170,11 @@ snapshots:
       - debug
       - utf-8-validate
 
-  '@wormhole-foundation/sdk-evm-ntt@0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+  '@wormhole-foundation/sdk-evm-ntt@0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
       '@wormhole-foundation/sdk-base': 1.7.0
       '@wormhole-foundation/sdk-definitions': 1.7.0
-      '@wormhole-foundation/sdk-definitions-ntt': 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
+      '@wormhole-foundation/sdk-definitions-ntt': 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
       '@wormhole-foundation/sdk-evm': 1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-evm-core': 1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       ethers: 6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -3214,12 +3214,12 @@ snapshots:
       - debug
       - utf-8-validate
 
-  '@wormhole-foundation/sdk-route-ntt@0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-connect@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)':
+  '@wormhole-foundation/sdk-route-ntt@0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-connect@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@wormhole-foundation/sdk-connect': 1.7.0
-      '@wormhole-foundation/sdk-definitions-ntt': 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
-      '@wormhole-foundation/sdk-evm-ntt': 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      '@wormhole-foundation/sdk-solana-ntt': 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)
+      '@wormhole-foundation/sdk-definitions-ntt': 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
+      '@wormhole-foundation/sdk-evm-ntt': 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-evm-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-evm@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@wormhole-foundation/sdk-solana-ntt': 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - '@wormhole-foundation/sdk-base'
       - '@wormhole-foundation/sdk-definitions'
@@ -3259,7 +3259,7 @@ snapshots:
       - encoding
       - utf-8-validate
 
-  '@wormhole-foundation/sdk-solana-ntt@0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)':
+  '@wormhole-foundation/sdk-solana-ntt@0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)(@wormhole-foundation/sdk-solana-core@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@wormhole-foundation/sdk-solana@1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.6.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': 0.29.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@coral-xyz/borsh': 0.29.0(@solana/web3.js@1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))
@@ -3267,7 +3267,7 @@ snapshots:
       '@solana/web3.js': 1.98.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-base': 1.7.0
       '@wormhole-foundation/sdk-definitions': 1.7.0
-      '@wormhole-foundation/sdk-definitions-ntt': 0.6.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
+      '@wormhole-foundation/sdk-definitions-ntt': 0.7.1(@wormhole-foundation/sdk-base@1.7.0)(@wormhole-foundation/sdk-definitions@1.7.0)
       '@wormhole-foundation/sdk-solana': 1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@wormhole-foundation/sdk-solana-core': 1.7.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       bn.js: 5.2.1
