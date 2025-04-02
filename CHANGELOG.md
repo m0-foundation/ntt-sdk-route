@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.5
+
+### Patch Changes
+
+- ecc5c4a: bump wormhole ntt sdk
+
 ## 0.0.4
 
 ### Patch Changes
