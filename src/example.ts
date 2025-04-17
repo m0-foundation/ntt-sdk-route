@@ -1,8 +1,10 @@
-import { Chain, ChainAddress, ChainContext, Network, Signer, Wormhole, canonicalAddress, routes, wormhole } from "@wormhole-foundation/sdk";
+import { Chain, ChainAddress, ChainContext, Network, Signer, Wormhole, chainToPlatform, canonicalAddress, routes, wormhole } from "@wormhole-foundation/sdk";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
+import solana from "@wormhole-foundation/sdk/platforms/solana";
 import '@wormhole-foundation/sdk-definitions-ntt';
 import '@wormhole-foundation/sdk-evm-ntt';
 import evmLoader from "@wormhole-foundation/sdk/evm";
+import solanaLoader from "@wormhole-foundation/sdk/solana";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
 import 'dotenv/config'
 
@@ -13,26 +15,41 @@ export interface SignerStuff<N extends Network, C extends Chain> {
 }
 
 async function getSigner<N extends Network, C extends Chain>(
-    chain: ChainContext<N, C>,
-  ): Promise<SignerStuff<N, C>> {
-    const signer = await evm.getSigner(
-      await chain.getRpc(),
-      process.env.PRIVATE_KEY!
-    );
- 
-    return {
-      chain,
-      signer: signer as Signer<N, C>,
-      address: Wormhole.chainAddress(chain.chain, signer.address()),
-    };
+  chain: ChainContext<N, C>,
+): Promise<SignerStuff<N, C>> {
+  const platform = chainToPlatform(chain.chain);
+  let signer: Signer;
+  switch (platform) {
+    case "Solana":
+      signer = await solana.getSigner(
+        await chain.getRpc(),
+        process.env.SOLANA_PRIVATE_KEY!,
+        { debug: false }
+      );
+      break;
+    case "Evm":
+      signer = await evm.getSigner(
+        await chain.getRpc(),
+        process.env.PRIVATE_KEY!
+      );
+      break;
+    default:
+      throw new Error("Unrecognized platform: " + platform);
   }
+
+  return {
+    chain,
+    signer: signer as Signer<N, C>,
+    address: Wormhole.chainAddress(chain.chain, signer.address()),
+  };
+}
 
 (async function () {
   // Setup
-  const wh = await wormhole("Testnet", [evmLoader]);
-  
+  const wh = await wormhole("Testnet", [evmLoader, solanaLoader]);
+
   const src = wh.getChain("Sepolia");
-  const dst = wh.getChain("OptimismSepolia");
+  const dst = wh.getChain("Solana");
 
   const srcSigner = await getSigner(src);
   const dstSigner = await getSigner(dst);
