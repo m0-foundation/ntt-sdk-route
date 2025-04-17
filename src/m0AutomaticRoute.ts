@@ -382,10 +382,10 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   public override async *track(receipt: R, timeout?: number) {
+    const isEvmPlatform = (chain: Chain) => chainToPlatform(chain) === "Evm";
+
     if (isSourceInitiated(receipt) || isSourceFinalized(receipt)) {
       const { txid } = receipt.originTxs[receipt.originTxs.length - 1]!;
-
-      const isEvmPlatform = (chain: Chain) => chainToPlatform(chain) === "Evm";
       const vaaType =
         isEvmPlatform(receipt.from) && isEvmPlatform(receipt.to)
           ? "Ntt:WormholeTransferStandardRelayer" // Automatic NTT transfers between EVM chains use standard relayers
@@ -435,7 +435,16 @@ export class M0AutomaticRoute<N extends Network>
 
     if (isRedeemed(receipt)) {
       const { attestation: { attestation: vaa } } = receipt;
-      const isExecuted = await ntt.getIsExecuted(vaa);
+      const payload =
+        vaa.payloadName === "WormholeTransfer"
+          ? vaa.payload
+          : vaa.payload["payload"];
+
+      const isExecuted = isEvmPlatform(receipt.to)
+        ? await (ntt as EvmNtt<N, EvmChains>).manager.isMessageExecuted(
+          Ntt.messageDigest(vaa.emitterChain, payload["nttManagerPayload"])
+        )
+        : await ntt.getIsExecuted(vaa);
 
       if (isExecuted) {
         receipt = {
