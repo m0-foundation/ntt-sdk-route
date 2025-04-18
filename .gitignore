@@ -27,3 +27,6 @@ dist
 
 # Cache
 .cache
+
+# env
+.env
