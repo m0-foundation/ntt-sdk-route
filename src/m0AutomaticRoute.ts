@@ -85,7 +85,7 @@ export class M0AutomaticRoute<N extends Network>
       // Only M token can be bridged from Solana
       mLikeTokens: [],
       manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
-      transceiver: { wormhole: "J1bVGcwG3nPsAJsi3GFNqC9NZmKatSuoutPbaKMiT7Bm" },
+      transceiver: { wormhole: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY" },
       quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"
     }
   }
