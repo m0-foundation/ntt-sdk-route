@@ -6,6 +6,7 @@ import '@wormhole-foundation/sdk-evm-ntt';
 import evmLoader from "@wormhole-foundation/sdk/evm";
 import solanaLoader from "@wormhole-foundation/sdk/solana";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
+import "@wormhole-foundation/sdk-solana-ntt";
 import 'dotenv/config'
 
 export interface SignerStuff<N extends Network, C extends Chain> {
