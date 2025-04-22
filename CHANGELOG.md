@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.6
+
+### Patch Changes
+
+- c05512a: Solana support
+
 ## 0.0.5
 
 ### Patch Changes
