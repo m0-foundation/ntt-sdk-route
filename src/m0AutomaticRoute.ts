@@ -51,46 +51,66 @@ type Q = routes.Quote<Op, Vp>;
 
 type R = NttRoute.AutomaticTransferReceipt;
 
-type Contracts = Ntt.Contracts & { wrappedMToken: string };
+type Contracts = Ntt.Contracts & { mLikeTokens: string[] };
 
 export class M0AutomaticRoute<N extends Network>
   extends routes.AutomaticRoute<N, Op, Vp, R>
-  implements routes.StaticRouteMethods<typeof M0AutomaticRoute>
-{
+  implements routes.StaticRouteMethods<typeof M0AutomaticRoute> {
   // ntt does not support gas drop-off currently
   static NATIVE_GAS_DROPOFF_SUPPORTED: boolean = false;
+
+  // Wrapped M token address is the same on EVM chains
+  static EVM_WRAPPED_M_TOKEN = "0x437cc33344a0B27A429f795ff6B469C72698B291";
+
+  static SOLANA_MAINNET_M_TOKEN = "mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo";
+  static SOLANA_TESTNET_M_TOKEN = "mzeroZRGCah3j5xEWp2Nih3GDejSBbH1rbHoxDg8By6";
 
   // Contract addresses are the same on all EVM chains
   static EVM_CONTRACTS: Contracts = {
     // M token address is the same on EVM chains
     token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
-    // Wrapped M token address is the same on EVM chains
-    wrappedMToken: "0x437cc33344a0B27A429f795ff6B469C72698B291",
+    // Wrapped $M and Extension Tokens that can bridged by unwrapping to $M
+    mLikeTokens: [this.EVM_WRAPPED_M_TOKEN],
     // M0 Portal address is the same on EVM chains
     manager: "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd",
     // Wormhole transceiver address is the same on EVM chains
     transceiver: { wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841" },
   };
 
-  static meta = { name: "M0AutomaticRoute", provider: "M^0" };
+  static meta = { name: "M0AutomaticRoute", provider: "M0" };
+
+  static solanaContracts(network: Network): Contracts {
+    return {
+      token: network == "Mainnet" ? this.SOLANA_MAINNET_M_TOKEN : this.SOLANA_TESTNET_M_TOKEN,
+      // Only M token can be bridged from Solana
+      mLikeTokens: [],
+      manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
+      transceiver: { wormhole: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY" },
+      quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"
+    }
+  }
 
   static supportedNetworks(): Network[] {
     return ["Mainnet", "Testnet"];
   }
 
+  static isPlatformSupported(platform: string): boolean {
+    return platform == "Evm" || platform == "Solana";
+  }
+
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism"];
+        return ["Ethereum", "Arbitrum", "Optimism", "Solana"];
       case "Testnet":
-        return ["Sepolia", "ArbitrumSepolia", "OptimismSepolia"];
+        return ["Sepolia", "ArbitrumSepolia", "OptimismSepolia", "Solana"];
       default:
         throw new Error(`Unsupported network: ${network}`);
     }
   }
 
-  static getContracts(chain: Chain): Contracts {
-    switch (chain) {
+  static getContracts(chainContext: ChainContext<Network>): Contracts {
+    switch (chainContext.chain) {
       case "Ethereum":
         return this.EVM_CONTRACTS;
       case "Optimism":
@@ -103,18 +123,20 @@ export class M0AutomaticRoute<N extends Network>
         return this.EVM_CONTRACTS;
       case "ArbitrumSepolia":
         return this.EVM_CONTRACTS;
+      case "Solana":
+        return this.solanaContracts(chainContext.network);
       default:
-        throw new Error(`Unsupported chain: ${chain}`);
+        throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
   }
 
   static async supportedSourceTokens(
     fromChain: ChainContext<Network>
   ): Promise<TokenId[]> {
-    const { token, wrappedMToken } = this.getContracts(fromChain.chain);
+    const { token, mLikeTokens } = this.getContracts(fromChain);
     return [
       Wormhole.tokenId(fromChain.chain, token),
-      Wormhole.tokenId(fromChain.chain, wrappedMToken),
+      ...mLikeTokens.map(x => Wormhole.tokenId(fromChain.chain, x))
     ];
   }
 
@@ -128,10 +150,10 @@ export class M0AutomaticRoute<N extends Network>
       return [];
     }
 
-    const { token: mToken, wrappedMToken } = this.getContracts(toChain.chain);
+    const { token: mToken, mLikeTokens } = this.getContracts(toChain);
     return [
       Wormhole.tokenId(toChain.chain, mToken),
-      Wormhole.tokenId(toChain.chain, wrappedMToken),
+      ...mLikeTokens.map(x => Wormhole.tokenId(toChain.chain, x))
     ];
   }
 
@@ -147,7 +169,7 @@ export class M0AutomaticRoute<N extends Network>
 
   async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
     const ntt = await request.fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(request.fromChain.chain),
+      ntt: M0AutomaticRoute.getContracts(request.fromChain),
     });
 
     return ntt.isRelayingAvailable(request.toChain.chain);
@@ -171,10 +193,8 @@ export class M0AutomaticRoute<N extends Network>
       request.destination.decimals
     );
 
-    const fromContracts = M0AutomaticRoute.getContracts(
-      request.fromChain.chain
-    );
-    const toContracts = M0AutomaticRoute.getContracts(request.toChain.chain);
+    const fromContracts = M0AutomaticRoute.getContracts(request.fromChain);
+    const toContracts = M0AutomaticRoute.getContracts(request.toChain);
 
     const validatedParams: Vp = {
       amount: params.amount,
@@ -199,7 +219,7 @@ export class M0AutomaticRoute<N extends Network>
   ): Promise<QR> {
     const { fromChain, toChain } = request;
     const ntt = await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.chain),
+      ntt: M0AutomaticRoute.getContracts(fromChain),
     });
 
     if (!(await ntt.isRelayingAvailable(toChain.chain))) {
@@ -256,26 +276,25 @@ export class M0AutomaticRoute<N extends Network>
     const { params } = quote;
     const { fromChain } = request;
     const sender = Wormhole.parseAddress(signer.chain(), signer.address());
+    const platform = chainToPlatform(fromChain.chain);
+    const transferAmount = amount.units(params.normalizedParams.amount);
+    const options = params.normalizedParams.options;
 
-    if (chainToPlatform(fromChain.chain) !== "Evm")
-      throw new Error("The route supports only EVM");
+    if (platform !== "Evm" && platform !== "Solana")
+      throw new Error(`Unsupported platform ${platform}`);
 
     const ntt = (await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain.chain),
-    })) as EvmNtt<N, EvmChains>;
+      ntt: M0AutomaticRoute.getContracts(fromChain),
+    }));
 
-    const sourceTokenAddress = canonicalAddress(request.source.id);
-    const destinationTokenAddress = canonicalAddress(request.destination.id);
+    const sourceToken = canonicalAddress(request.source.id);
+    const destinationToken = canonicalAddress(request.destination.id);
 
-    const initXfer = this.transferMLike(
-      ntt,
-      sender,
-      amount.units(params.normalizedParams.amount),
-      to,
-      sourceTokenAddress,
-      destinationTokenAddress,
-      params.normalizedParams.options
-    );
+    const initXfer = platform === "Evm"
+      // for EVM call transferMLike function
+      ? this.transferMLike(ntt as EvmNtt<N, EvmChains>, sender, transferAmount, to, sourceToken, destinationToken, options)
+      // for Solana use the default NTT transfer
+      : ntt.transfer(sender, transferAmount, to, options);
 
     const txids = await signSendWait(fromChain, initXfer, signer);
 
@@ -363,14 +382,13 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   public override async *track(receipt: R, timeout?: number) {
+    const isEvmPlatform = (chain: Chain) => chainToPlatform(chain) === "Evm";
+
     if (isSourceInitiated(receipt) || isSourceFinalized(receipt)) {
       const { txid } = receipt.originTxs[receipt.originTxs.length - 1]!;
-
-      const isEvmPlatform = (chain: Chain) => chainToPlatform(chain) === "Evm";
       const vaaType =
         isEvmPlatform(receipt.from) && isEvmPlatform(receipt.to)
-          ? // Automatic NTT transfers between EVM chains use standard relayers
-            "Ntt:WormholeTransferStandardRelayer"
+          ? "Ntt:WormholeTransferStandardRelayer" // Automatic NTT transfers between EVM chains use standard relayers
           : "Ntt:WormholeTransfer";
       const vaa = await this.wh.getVaa(txid, vaaType, timeout);
       if (!vaa) {
@@ -397,8 +415,8 @@ export class M0AutomaticRoute<N extends Network>
 
     const toChain = this.wh.getChain(receipt.to);
     const ntt = (await toChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(toChain.chain),
-    })) as EvmNtt<N, EvmChains>;
+      ntt: M0AutomaticRoute.getContracts(toChain),
+    }));
 
     if (isAttested(receipt)) {
       const {
@@ -416,17 +434,18 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     if (isRedeemed(receipt)) {
-      const {
-        attestation: { attestation: vaa },
-      } = receipt;
-
+      const { attestation: { attestation: vaa } } = receipt;
       const payload =
         vaa.payloadName === "WormholeTransfer"
           ? vaa.payload
           : vaa.payload["payload"];
-      const isExecuted = await ntt.manager.isMessageExecuted(
-        Ntt.messageDigest(vaa.emitterChain, payload["nttManagerPayload"])
-      );
+
+      const isExecuted = isEvmPlatform(receipt.to)
+        ? await (ntt as EvmNtt<N, EvmChains>).manager.isMessageExecuted(
+          Ntt.messageDigest(vaa.emitterChain, payload["nttManagerPayload"])
+        )
+        : await ntt.getIsExecuted(vaa);
+
       if (isExecuted) {
         receipt = {
           ...receipt,
