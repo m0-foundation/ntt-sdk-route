@@ -40,6 +40,8 @@
     "@wormhole-foundation/sdk-definitions-ntt": "^0.7.1",
     "@wormhole-foundation/sdk-evm": "^1.7.0",
     "@wormhole-foundation/sdk-evm-ntt": "^0.7.1",
+    "@wormhole-foundation/sdk-solana": "^1.7.0",
+    "@wormhole-foundation/sdk-solana-ntt": "^0.7.1",
     "@wormhole-foundation/sdk-route-ntt": "^0.7.1",
     "ethers": "^6.5.1"
   }

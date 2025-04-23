@@ -29,6 +29,7 @@ import {
 } from "@wormhole-foundation/sdk-connect";
 import "@wormhole-foundation/sdk-definitions-ntt";
 import { EvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
+import "@wormhole-foundation/sdk-solana-ntt";
 import {
   addChainId,
   addFrom,
@@ -37,6 +38,7 @@ import {
   EvmPlatform,
   EvmUnsignedTransaction,
 } from "@wormhole-foundation/sdk-evm";
+import "@wormhole-foundation/sdk-solana";
 import { NttRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { Contract, TransactionRequest } from "ethers";
 import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
@@ -292,6 +294,7 @@ export class M0AutomaticRoute<N extends Network>
 
     const initXfer = platform === "Evm"
       // for EVM call transferMLike function
+      // @ts-ignore
       ? this.transferMLike(ntt as EvmNtt<N, EvmChains>, sender, transferAmount, to, sourceToken, destinationToken, options)
       // for Solana use the default NTT transfer
       : ntt.transfer(sender, transferAmount, to, options);
