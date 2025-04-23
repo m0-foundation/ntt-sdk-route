@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.7
+
+### Patch Changes
+
+- 0bf1158: Import Solana packages so native address type gets registered
+
 ## 0.0.6
 
 ### Patch Changes
