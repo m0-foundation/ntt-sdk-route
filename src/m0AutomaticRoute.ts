@@ -153,10 +153,12 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     const { token: mToken, mLikeTokens } = this.getContracts(toChain);
-    return [
-      Wormhole.tokenId(toChain.chain, mToken),
-      ...mLikeTokens.map(x => Wormhole.tokenId(toChain.chain, x))
-    ];
+    const toMToken = Wormhole.tokenId(toChain.chain, mToken);
+
+    // Only M token can be transferred from Solana
+    return chainToPlatform(fromChain.chain) === "Solana" 
+      ? [toMToken] 
+      : [toMToken, ...mLikeTokens.map(x => Wormhole.tokenId(toChain.chain, x))];
   }
 
   static isProtocolSupported<N extends Network>(
