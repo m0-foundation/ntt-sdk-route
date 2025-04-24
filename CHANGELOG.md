@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.9
+
+### Patch Changes
+
+- cc163e0: fix Solana destination tokens
+
 ## 0.0.8
 
 ### Patch Changes
