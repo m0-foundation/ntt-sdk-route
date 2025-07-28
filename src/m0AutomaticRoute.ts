@@ -334,6 +334,8 @@ export class M0AutomaticRoute<N extends Network>
             sender,
             transferAmount,
             to,
+            sourceToken,
+            destinationToken,
             options
           );
 
@@ -427,8 +429,17 @@ export class M0AutomaticRoute<N extends Network>
     sender: AccountAddress<C>,
     amount: bigint,
     destination: ChainAddress,
+    sourceToken: string,
+    destinationToken: string,
     options: Ntt.TransferOptions
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
+    if (
+      destinationToken === M0AutomaticRoute.SOLANA_MAINNET_M_TOKEN ||
+      destinationToken === M0AutomaticRoute.SOLANA_TESTNET_M_TOKEN
+    ) {
+      return ntt.transfer(sender, amount, destination, options);
+    }
+
     const config = await ntt.getConfig();
     if (config.paused) throw new Error("Contract is paused");
 
