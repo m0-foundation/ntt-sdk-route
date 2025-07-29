@@ -25,7 +25,7 @@ const EARN_PROGRAM = new PublicKey(
   "mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"
 );
 
-export async function getTransferBurnExtensionIx<
+export async function getTransferExtensionBurnIx<
   N extends Network,
   C extends SolanaChains
 >(
@@ -239,12 +239,6 @@ export async function getTransferBurnExtensionIx<
         isSigner: false,
         isWritable: false,
       },
-      {
-        // ata program
-        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      },
     ],
     data: Buffer.concat([
       Buffer.from(sha256("global:transfer_extension_burn").subarray(0, 8)),
@@ -253,6 +247,195 @@ export async function getTransferBurnExtensionIx<
       recipientAddress, // recipient_address
       destinationToken, // destination_token
       Buffer.from([Number(shouldQueue)]), // should_queue
+    ]),
+  });
+}
+
+export async function getReleaseInboundMintExtensionIx<
+  N extends Network,
+  C extends SolanaChains
+>(
+  ntt: SolanaNtt<N, C>,
+  payer: string,
+  inboxItem: PublicKey,
+  mMint: PublicKey,
+  extProgram: PublicKey,
+  extMint: PublicKey,
+  extAta: PublicKey,
+  extTokenProgram: PublicKey
+): Promise<TransactionInstruction> {
+  return new TransactionInstruction({
+    programId: ntt.program.programId,
+    keys: [
+      {
+        pubkey: new PublicKey(payer),
+        isSigner: true,
+        isWritable: true,
+      },
+      {
+        // config
+        pubkey: ntt.pdas.configAccount(),
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // inbox item
+        pubkey: inboxItem,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // recipient (mint to token auth which wraps to user)
+        pubkey: getAssociatedTokenAddressSync(
+          mMint,
+          PublicKey.findProgramAddressSync(
+            [Buffer.from("token_authority")],
+            extProgram
+          )[0],
+          true,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // token auth
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("token_authority")],
+          ntt.program.programId
+        )[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // m mint
+        pubkey: mMint,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // m token program
+        pubkey: TOKEN_2022_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // custody
+        pubkey: ntt.config!.custody,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // multisig
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // earn program
+        pubkey: EARN_PROGRAM,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // m global
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("global")],
+          EARN_PROGRAM
+        )[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext mint
+        pubkey: extMint,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // swap global
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("global")],
+          SWAP_PROGRAM
+        )[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext global
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("global")],
+          extProgram
+        )[0],
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // ext m vault auth
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("m_vault")],
+          extProgram
+        )[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext mint auth
+        pubkey: PublicKey.findProgramAddressSync(
+          [Buffer.from("mint_authority")],
+          extProgram
+        )[0],
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext m vault
+        pubkey: getAssociatedTokenAddressSync(
+          mMint,
+          PublicKey.findProgramAddressSync(
+            [Buffer.from("m_vault")],
+            extProgram
+          )[0],
+          true,
+          TOKEN_2022_PROGRAM_ID
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // ext token account
+        pubkey: extAta,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        // ext token account
+        pubkey: SWAP_PROGRAM,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext program
+        pubkey: extProgram,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // ext token program
+        pubkey: extTokenProgram,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        // system program
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+    ],
+    data: Buffer.concat([
+      Buffer.from(
+        sha256("global:release_inbound_mint_extension_multisig").subarray(0, 8)
+      ),
     ]),
   });
 }
