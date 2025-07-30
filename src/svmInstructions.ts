@@ -1,8 +1,7 @@
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
-} from "@solana/spl-token";
-import {
+  AddressLookupTableAccount,
+  Connection,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -18,32 +17,51 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import BN from "bn.js";
 import { sha256 } from "@noble/hashes/sha2";
 
-const SWAP_PROGRAM = new PublicKey(
-  "MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"
-);
-const EARN_PROGRAM = new PublicKey(
-  "mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"
-);
+type ExtensionDetails = {
+  program: PublicKey;
+  tokenProgram: PublicKey;
+};
 
-export async function getTransferExtensionBurnIx<
+const PROGRAMS = {
+  swap: new PublicKey("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
+  earn: new PublicKey("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
+  mMint: new PublicKey("mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo"),
+  luts: [
+    new PublicKey("6GhuWPuAmiJeeSVsr58KjqHcAejJRndCx9BVtHkaYHUR"),
+    new PublicKey("9JLRqBqkznKiSoNfotA4ywSRdnWb2fE76SiFrAfkaRCD"),
+  ],
+};
+
+const EXT_PROGRAMS: Record<string, ExtensionDetails> = {
+  mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
+    program: new PublicKey("wMXX1K1nca5W4pZr1piETe78gcAVVrEFi9f4g46uXko"),
+    tokenProgram: TOKEN_2022_PROGRAM_ID,
+  },
+  usdkbee86pkLyRmxfFCdkyySpxRb5ndCxVsK2BkRXwX: {
+    program: new PublicKey("extaykYu5AQcDm3qZAbiDN3yp6skqn6Nssj7veUUGZw"),
+    tokenProgram: TOKEN_2022_PROGRAM_ID,
+  },
+  usdkyPPxgV7sfNyKb8eDz66ogPrkRXG3wS2FVb6LLUf: {
+    program: new PublicKey("extMahs9bUFMYcviKCvnSRaXgs5PcqmMzcnHRtTqE85"),
+    tokenProgram: TOKEN_2022_PROGRAM_ID,
+  },
+};
+
+export function getTransferExtensionBurnIx<
   N extends Network,
   C extends SolanaChains
 >(
   ntt: SolanaNtt<N, C>,
-  amount: number,
-  destination: ChainAddress,
-  payer: string,
+  amount: bigint,
+  recipient: ChainAddress,
+  payer: PublicKey,
   outboxItem: PublicKey,
-  mMint: PublicKey,
-  extProgram: PublicKey,
   extMint: PublicKey,
-  extAta: PublicKey,
-  extTokenProgram: PublicKey,
-  destinationToken: Buffer,
+  destinationToken: Uint8Array,
   shouldQueue = true
-): Promise<TransactionInstruction> {
+): TransactionInstruction {
   const recipientAddress = Buffer.alloc(32);
-  const dest = Buffer.from(destination.address.toUint8Array());
+  const dest = Buffer.from(recipient.address.toUint8Array());
   dest.copy(recipientAddress);
 
   if (destinationToken.length !== 32) {
@@ -52,11 +70,20 @@ export async function getTransferExtensionBurnIx<
     );
   }
 
+  const extension = EXT_PROGRAMS[extMint.toBase58()];
+  if (!extension) {
+    throw new Error(
+      `No extension program found for mint ${extMint.toBase58()}`
+    );
+  }
+
+  const { program: extProgram, tokenProgram: extTokenProgram } = extension;
+
   return new TransactionInstruction({
     programId: ntt.program.programId,
     keys: [
       {
-        pubkey: new PublicKey(payer),
+        pubkey: payer,
         isSigner: true,
         isWritable: true,
       },
@@ -68,14 +95,14 @@ export async function getTransferExtensionBurnIx<
       },
       {
         // m mint
-        pubkey: mMint,
+        pubkey: PROGRAMS.mMint,
         isSigner: false,
         isWritable: true,
       },
       {
         // from (token auth m token account)
         pubkey: getAssociatedTokenAddressSync(
-          mMint,
+          PROGRAMS.mMint,
           PublicKey.findProgramAddressSync(
             [Buffer.from("token_authority")],
             ntt.program.programId
@@ -118,13 +145,13 @@ export async function getTransferExtensionBurnIx<
       },
       {
         // inbox rate limit
-        pubkey: ntt.pdas.inboxRateLimitAccount(destination.chain),
+        pubkey: ntt.pdas.inboxRateLimitAccount(recipient.chain),
         isSigner: false,
         isWritable: true,
       },
       {
         // peer
-        pubkey: ntt.pdas.peerAccount(destination.chain),
+        pubkey: ntt.pdas.peerAccount(recipient.chain),
         isSigner: false,
         isWritable: false,
       },
@@ -160,7 +187,7 @@ export async function getTransferExtensionBurnIx<
         // swap global
         pubkey: PublicKey.findProgramAddressSync(
           [Buffer.from("global")],
-          SWAP_PROGRAM
+          PROGRAMS.swap
         )[0],
         isSigner: false,
         isWritable: false,
@@ -169,7 +196,7 @@ export async function getTransferExtensionBurnIx<
         // m global
         pubkey: PublicKey.findProgramAddressSync(
           [Buffer.from("global")],
-          EARN_PROGRAM
+          PROGRAMS.earn
         )[0],
         isSigner: false,
         isWritable: false,
@@ -185,14 +212,19 @@ export async function getTransferExtensionBurnIx<
       },
       {
         // ext token account
-        pubkey: extAta,
+        pubkey: getAssociatedTokenAddressSync(
+          extMint,
+          payer,
+          true,
+          extTokenProgram
+        ),
         isSigner: false,
         isWritable: true,
       },
       {
         // ext m vault
         pubkey: getAssociatedTokenAddressSync(
-          mMint,
+          PROGRAMS.mMint,
           PublicKey.findProgramAddressSync(
             [Buffer.from("m_vault")],
             extProgram
@@ -229,7 +261,7 @@ export async function getTransferExtensionBurnIx<
       },
       {
         // swap program
-        pubkey: SWAP_PROGRAM,
+        pubkey: PROGRAMS.swap,
         isSigner: false,
         isWritable: false,
       },
@@ -243,7 +275,7 @@ export async function getTransferExtensionBurnIx<
     data: Buffer.concat([
       Buffer.from(sha256("global:transfer_extension_burn").subarray(0, 8)),
       new BN(amount).toArrayLike(Buffer, "le", 8), // amount
-      new BN(chainToChainId(destination.chain)).toArrayLike(Buffer, "le", 2), // chain_id
+      new BN(chainToChainId(recipient.chain)).toArrayLike(Buffer, "le", 2), // chain_id
       recipientAddress, // recipient_address
       destinationToken, // destination_token
       Buffer.from([Number(shouldQueue)]), // should_queue
@@ -251,7 +283,7 @@ export async function getTransferExtensionBurnIx<
   });
 }
 
-export async function getReleaseInboundMintExtensionIx<
+export function getReleaseInboundMintExtensionIx<
   N extends Network,
   C extends SolanaChains
 >(
@@ -259,11 +291,18 @@ export async function getReleaseInboundMintExtensionIx<
   payer: string,
   inboxItem: PublicKey,
   mMint: PublicKey,
-  extProgram: PublicKey,
   extMint: PublicKey,
-  extAta: PublicKey,
-  extTokenProgram: PublicKey
-): Promise<TransactionInstruction> {
+  extAta: PublicKey
+): TransactionInstruction {
+  const extension = EXT_PROGRAMS[extMint.toBase58()];
+  if (!extension) {
+    throw new Error(
+      `No extension program found for mint ${extMint.toBase58()}`
+    );
+  }
+
+  const { program: extProgram, tokenProgram: extTokenProgram } = extension;
+
   return new TransactionInstruction({
     programId: ntt.program.programId,
     keys: [
@@ -326,13 +365,8 @@ export async function getReleaseInboundMintExtensionIx<
         isWritable: true,
       },
       {
-        // multisig
-        isSigner: false,
-        isWritable: false,
-      },
-      {
         // earn program
-        pubkey: EARN_PROGRAM,
+        pubkey: PROGRAMS.earn,
         isSigner: false,
         isWritable: false,
       },
@@ -340,7 +374,7 @@ export async function getReleaseInboundMintExtensionIx<
         // m global
         pubkey: PublicKey.findProgramAddressSync(
           [Buffer.from("global")],
-          EARN_PROGRAM
+          PROGRAMS.earn
         )[0],
         isSigner: false,
         isWritable: false,
@@ -355,7 +389,7 @@ export async function getReleaseInboundMintExtensionIx<
         // swap global
         pubkey: PublicKey.findProgramAddressSync(
           [Buffer.from("global")],
-          SWAP_PROGRAM
+          PROGRAMS.swap
         )[0],
         isSigner: false,
         isWritable: false,
@@ -409,7 +443,7 @@ export async function getReleaseInboundMintExtensionIx<
       },
       {
         // ext token account
-        pubkey: SWAP_PROGRAM,
+        pubkey: PROGRAMS.swap,
         isSigner: false,
         isWritable: false,
       },
@@ -438,4 +472,24 @@ export async function getReleaseInboundMintExtensionIx<
       ),
     ]),
   });
+}
+
+export async function getAddressLookupTableAccounts(
+  connection: Connection
+): Promise<AddressLookupTableAccount[]> {
+  const addressLookupTableAccountInfos =
+    await connection.getMultipleAccountsInfo(PROGRAMS.luts);
+
+  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+    const addressLookupTableAddress = PROGRAMS.luts[index];
+    if (accountInfo) {
+      const addressLookupTableAccount = new AddressLookupTableAccount({
+        key: new PublicKey(addressLookupTableAddress),
+        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+      });
+      acc.push(addressLookupTableAccount);
+    }
+
+    return acc;
+  }, new Array<AddressLookupTableAccount>());
 }

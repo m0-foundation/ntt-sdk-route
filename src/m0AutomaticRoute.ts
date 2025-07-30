@@ -29,11 +29,7 @@ import {
 } from "@wormhole-foundation/sdk-connect";
 import "@wormhole-foundation/sdk-definitions-ntt";
 import { EvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
-import {
-  NTT,
-  SolanaNtt,
-  WEI_PER_GWEI,
-} from "@wormhole-foundation/sdk-solana-ntt";
+import { SolanaNtt, WEI_PER_GWEI } from "@wormhole-foundation/sdk-solana-ntt";
 import {
   addChainId,
   addFrom,
@@ -44,7 +40,7 @@ import {
 } from "@wormhole-foundation/sdk-evm";
 import "@wormhole-foundation/sdk-solana";
 import { NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { Contract, TransactionRequest } from "ethers";
+import { Contract, getAddress, TransactionRequest } from "ethers";
 import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
   SolanaAddress,
@@ -58,8 +54,12 @@ import {
   TransactionMessage,
   VersionedTransaction,
   Transaction,
+  PublicKey,
 } from "@solana/web3.js";
-import * as splToken from "@solana/spl-token";
+import {
+  getAddressLookupTableAccounts,
+  getTransferExtensionBurnIx,
+} from "./svmInstructions";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -428,16 +428,17 @@ export class M0AutomaticRoute<N extends Network>
     ntt: SolanaNtt<N, C>,
     sender: AccountAddress<C>,
     amount: bigint,
-    destination: ChainAddress,
+    recipient: ChainAddress,
     sourceToken: string,
     destinationToken: string,
     options: Ntt.TransferOptions
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
     if (
-      destinationToken === M0AutomaticRoute.SOLANA_MAINNET_M_TOKEN ||
-      destinationToken === M0AutomaticRoute.SOLANA_TESTNET_M_TOKEN
+      sourceToken === M0AutomaticRoute.SOLANA_MAINNET_M_TOKEN ||
+      sourceToken === M0AutomaticRoute.SOLANA_TESTNET_M_TOKEN
     ) {
-      return ntt.transfer(sender, amount, destination, options);
+      // TODO: add remaining accounts
+      return ntt.transfer(sender, amount, recipient, options);
     }
 
     const config = await ntt.getConfig();
@@ -447,31 +448,19 @@ export class M0AutomaticRoute<N extends Network>
     const payerAddress = new SolanaAddress(sender).unwrap();
     const fromAuthority = payerAddress;
 
-    // User's M token account
-    const from = await splToken.getAssociatedTokenAddress(
-      config.mint,
-      fromAuthority,
-      true,
-      config.tokenProgram
-    );
-
-    const transferArgs = NTT.transferArgs(amount, destination, options.queue);
-
-    // Solana is a spoke so we need to create a transfer burn instruction
-    const transferIx = NTT.createTransferBurnInstruction(
-      ntt.program,
-      config,
-      {
-        transferArgs,
-        payer: payerAddress,
-        from,
-        fromAuthority,
-        outboxItem: outboxItem.publicKey,
-      },
-      ntt.pdas
-    );
-
-    const asyncIxs = [transferIx];
+    // Use custom transfer instruction for extension tokens
+    const ixs = [
+      getTransferExtensionBurnIx(
+        ntt,
+        amount,
+        recipient,
+        new PublicKey(sender.toUint8Array()),
+        outboxItem.publicKey,
+        new PublicKey(sourceToken),
+        toUniversal(recipient.chain, destinationToken).toUint8Array(),
+        options.queue
+      ),
+    ];
 
     // Create release ix for each transceiver
     for (let ix = 0; ix < ntt.transceivers.length; ++ix) {
@@ -480,29 +469,18 @@ export class M0AutomaticRoute<N extends Network>
         if (!whTransceiver) {
           throw new Error("wormhole transceiver not found");
         }
-        const releaseIx = whTransceiver.createReleaseWormholeOutboundIx(
+        const releaseIx = await whTransceiver.createReleaseWormholeOutboundIx(
           payerAddress,
           outboxItem.publicKey,
           !options.queue
         );
-        asyncIxs.push(releaseIx);
+        ixs.push(releaseIx);
       }
     }
 
     const tx = new Transaction();
     tx.feePayer = payerAddress;
-
-    // Spending approval on the M token account
-    const approveIx = splToken.createApproveInstruction(
-      from,
-      ntt.pdas.sessionAuthority(fromAuthority, transferArgs),
-      fromAuthority,
-      amount,
-      [],
-      config.tokenProgram
-    );
-
-    tx.add(approveIx, ...(await Promise.all(asyncIxs)));
+    tx.add(...ixs);
 
     // Pay fee to relay on destination chain
     if (options.automatic) {
@@ -511,14 +489,13 @@ export class M0AutomaticRoute<N extends Network>
           "No quoter available, cannot initiate an automatic transfer."
         );
 
-      const fee = await ntt.quoteDeliveryPrice(destination.chain, options);
+      const fee = await ntt.quoteDeliveryPrice(recipient.chain, options);
 
       const relayIx = await ntt.quoter.createRequestRelayInstruction(
         payerAddress,
         outboxItem.publicKey,
-        destination.chain,
+        recipient.chain,
         Number(fee) / LAMPORTS_PER_SOL,
-        // quoter expects gas dropoff to be in terms of gwei
         Number(options.gasDropoff ?? 0n) / WEI_PER_GWEI
       );
       tx.add(relayIx);
@@ -527,6 +504,7 @@ export class M0AutomaticRoute<N extends Network>
     const luts: AddressLookupTableAccount[] = [];
     try {
       luts.push(await ntt.getAddressLookupTable());
+      luts.push(...(await getAddressLookupTableAccounts(ntt.connection)));
     } catch {}
 
     const messageV0 = new TransactionMessage({
