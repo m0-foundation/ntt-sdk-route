@@ -56,11 +56,7 @@ import {
   Transaction,
   PublicKey,
 } from "@solana/web3.js";
-import {
-  getAddressLookupTableAccounts,
-  getSolanaContracts,
-  getTransferExtensionBurnIx,
-} from "./svm";
+import { SolanaRoutes } from "./svm";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -138,9 +134,9 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
         return this.EVM_CONTRACTS;
       case "Solana":
-        return getSolanaContracts(chainContext.network);
+        return new SolanaRoutes(chainContext.network).getSolanaContracts();
       case "Fogo" as Chain:
-        return getSolanaContracts(chainContext.network);
+        return new SolanaRoutes(chainContext.network).getSolanaContracts();
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -426,7 +422,9 @@ export class M0AutomaticRoute<N extends Network>
     destinationToken: string,
     options: Ntt.TransferOptions
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    if (getSolanaContracts(network).token === sourceToken) {
+    const router = new SolanaRoutes(network);
+
+    if (router.getSolanaContracts().token === sourceToken) {
       return ntt.transfer(sender, amount, recipient, options);
     }
 
@@ -438,9 +436,8 @@ export class M0AutomaticRoute<N extends Network>
 
     // Use custom transfer instruction for extension tokens
     const ixs = [
-      getTransferExtensionBurnIx(
+      router.getTransferExtensionBurnIx(
         ntt,
-        network,
         amount,
         recipient,
         new PublicKey(sender.toUint8Array()),
@@ -493,7 +490,7 @@ export class M0AutomaticRoute<N extends Network>
     const luts: AddressLookupTableAccount[] = [];
     try {
       luts.push(await ntt.getAddressLookupTable());
-      luts.push(await getAddressLookupTableAccounts(ntt.connection, network));
+      luts.push(await router.getAddressLookupTableAccounts(ntt.connection));
     } catch {}
 
     const messageV0 = new TransactionMessage({
