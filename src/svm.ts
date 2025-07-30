@@ -7,38 +7,49 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import {
+  Chain,
   ChainAddress,
+  ChainContext,
   chainToChainId,
   Network,
 } from "@wormhole-foundation/sdk-connect";
 import { SolanaChains } from "@wormhole-foundation/sdk-solana";
-import { SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
+import {
+  IdlVersion,
+  NTT,
+  NttBindings,
+  SolanaNtt,
+} from "@wormhole-foundation/sdk-solana-ntt";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
+import {
+  Ntt,
+  WormholeNttTransceiver,
+} from "@wormhole-foundation/sdk-definitions-ntt";
 import BN from "bn.js";
 import { sha256 } from "@noble/hashes/sha2";
 
-type SolanaNetwork = Exclude<Network, "Devnet">;
+type SvmNetwork = Exclude<Network, "Devnet">;
 
 type ExtensionDetails = {
   program: PublicKey;
   tokenProgram: PublicKey;
 };
 
-export class SolanaRoutes {
-  network: SolanaNetwork;
+export class SolanaRoutes<N extends Network, C extends SolanaChains> {
+  ntt: SolanaNtt<N, C>;
+  network: SvmNetwork;
   programs: Record<string, PublicKey>;
   extPrograms: Record<string, ExtensionDetails>;
 
-  constructor(network: Network) {
-    // Solana devnet is labeled as Testnet in wormhole SDKs
-    if (network === "Devnet") {
-      throw new Error("Solana does not support Devnet for NTT contracts");
-    }
+  constructor(ntt: SolanaNtt<N, C>) {
+    this.ntt = ntt;
+    this.network = ntt.network as SvmNetwork;
+    this.programs = SolanaRoutes.getPrograms(this.network);
+    this.extPrograms = SolanaRoutes.getExtPrograms(this.network);
+  }
 
-    this.network = network;
-
-    this.programs = {
+  private static getPrograms(network: SvmNetwork): Record<string, PublicKey> {
+    return {
       Mainnet: {
         swap: pk("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
         earn: pk("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
@@ -56,8 +67,12 @@ export class SolanaRoutes {
         quoter: pk("Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"),
       },
     }[network];
+  }
 
-    this.extPrograms = {
+  private static getExtPrograms(
+    network: SvmNetwork
+  ): Record<string, ExtensionDetails> {
+    return {
       Mainnet: {
         mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
           program: pk("wMXX1K1nca5W4pZr1piETe78gcAVVrEFi9f4g46uXko"),
@@ -89,18 +104,26 @@ export class SolanaRoutes {
     }[network];
   }
 
-  getSolanaContracts(): Ntt.Contracts & { mLikeTokens: string[] } {
+  static getSolanaContracts(
+    chainContext: ChainContext<Network>
+  ): Ntt.Contracts & { mLikeTokens: string[] } {
+    const programs = SolanaRoutes.getPrograms(
+      chainContext.network as SvmNetwork
+    );
+    const extPrograms = SolanaRoutes.getExtPrograms(
+      chainContext.network as SvmNetwork
+    );
+
     return {
-      token: this.programs.mMint.toBase58(),
-      mLikeTokens: Object.keys(this.extPrograms),
-      manager: this.programs.portal.toBase58(),
-      transceiver: { wormhole: this.programs.portal.toBase58() },
-      quoter: this.programs.quoter.toBase58(),
+      token: programs.mMint.toBase58(),
+      mLikeTokens: Object.keys(extPrograms),
+      manager: programs.portal.toBase58(),
+      transceiver: { wormhole: programs.portal.toBase58() },
+      quoter: programs.quoter.toBase58(),
     };
   }
 
-  getTransferExtensionBurnIx<N extends Network, C extends SolanaChains>(
-    ntt: SolanaNtt<N, C>,
+  getTransferExtensionBurnIx(
     amount: bigint,
     recipient: ChainAddress,
     payer: PublicKey,
@@ -129,7 +152,7 @@ export class SolanaRoutes {
     const { program: extProgram, tokenProgram: extTokenProgram } = extension;
 
     return new TransactionInstruction({
-      programId: ntt.program.programId,
+      programId: this.ntt.program.programId,
       keys: [
         {
           pubkey: payer,
@@ -138,7 +161,7 @@ export class SolanaRoutes {
         },
         {
           // config
-          pubkey: ntt.pdas.configAccount(),
+          pubkey: this.ntt.pdas.configAccount(),
           isSigner: false,
           isWritable: false,
         },
@@ -154,7 +177,7 @@ export class SolanaRoutes {
             this.programs.mMint,
             PublicKey.findProgramAddressSync(
               [Buffer.from("token_authority")],
-              ntt.program.programId
+              this.ntt.program.programId
             )[0],
             true,
             TOKEN_2022_PROGRAM_ID
@@ -176,13 +199,13 @@ export class SolanaRoutes {
         },
         {
           // outbox rate limit
-          pubkey: ntt.pdas.outboxRateLimitAccount(),
+          pubkey: this.ntt.pdas.outboxRateLimitAccount(),
           isSigner: false,
           isWritable: true,
         },
         {
           // custody
-          pubkey: ntt.config!.custody,
+          pubkey: this.ntt.config!.custody,
           isSigner: false,
           isWritable: true,
         },
@@ -194,19 +217,19 @@ export class SolanaRoutes {
         },
         {
           // inbox rate limit
-          pubkey: ntt.pdas.inboxRateLimitAccount(recipient.chain),
+          pubkey: this.ntt.pdas.inboxRateLimitAccount(recipient.chain),
           isSigner: false,
           isWritable: true,
         },
         {
           // peer
-          pubkey: ntt.pdas.peerAccount(recipient.chain),
+          pubkey: this.ntt.pdas.peerAccount(recipient.chain),
           isSigner: false,
           isWritable: false,
         },
         {
           // session auth
-          pubkey: ntt.pdas.sessionAuthority(payer, {
+          pubkey: this.ntt.pdas.sessionAuthority(payer, {
             amount: new BN(amount),
             recipientChain: {
               id: 2, // Ethereum
@@ -221,7 +244,7 @@ export class SolanaRoutes {
           // token auth
           pubkey: PublicKey.findProgramAddressSync(
             [Buffer.from("token_authority")],
-            ntt.program.programId
+            this.ntt.program.programId
           )[0],
           isSigner: false,
           isWritable: false,
@@ -332,11 +355,10 @@ export class SolanaRoutes {
     });
   }
 
-  getReleaseInboundMintExtensionIx<N extends Network, C extends SolanaChains>(
-    ntt: SolanaNtt<N, C>,
-    payer: string,
-    inboxItem: PublicKey,
-    mMint: PublicKey,
+  getReleaseInboundMintExtensionIx(
+    nttMessage: Ntt.Message,
+    emitterChain: Chain,
+    payer: PublicKey,
     extMint: PublicKey,
     extAta: PublicKey
   ): TransactionInstruction {
@@ -350,32 +372,32 @@ export class SolanaRoutes {
     const { program: extProgram, tokenProgram: extTokenProgram } = extension;
 
     return new TransactionInstruction({
-      programId: ntt.program.programId,
+      programId: this.ntt.program.programId,
       keys: [
         {
-          pubkey: pk(payer),
+          pubkey: payer,
           isSigner: true,
           isWritable: true,
         },
         {
           // config
-          pubkey: ntt.pdas.configAccount(),
+          pubkey: this.ntt.pdas.configAccount(),
           isSigner: false,
           isWritable: false,
         },
         {
           // inbox item
-          pubkey: inboxItem,
+          pubkey: this.ntt.pdas.inboxItemAccount(emitterChain, nttMessage),
           isSigner: false,
           isWritable: true,
         },
         {
           // recipient (mint to token auth which wraps to user)
           pubkey: getAssociatedTokenAddressSync(
-            mMint,
+            this.ntt.config!.mint,
             PublicKey.findProgramAddressSync(
               [Buffer.from("token_authority")],
-              ntt.program.programId
+              this.ntt.program.programId
             )[0],
             true,
             TOKEN_2022_PROGRAM_ID
@@ -387,14 +409,14 @@ export class SolanaRoutes {
           // token auth
           pubkey: PublicKey.findProgramAddressSync(
             [Buffer.from("token_authority")],
-            ntt.program.programId
+            this.ntt.program.programId
           )[0],
           isSigner: false,
           isWritable: false,
         },
         {
           // m mint
-          pubkey: mMint,
+          pubkey: this.ntt.config!.mint,
           isSigner: false,
           isWritable: true,
         },
@@ -406,7 +428,7 @@ export class SolanaRoutes {
         },
         {
           // custody
-          pubkey: ntt.config!.custody,
+          pubkey: this.ntt.config!.custody,
           isSigner: false,
           isWritable: true,
         },
@@ -470,7 +492,7 @@ export class SolanaRoutes {
         {
           // ext m vault
           pubkey: getAssociatedTokenAddressSync(
-            mMint,
+            this.ntt.config!.mint,
             PublicKey.findProgramAddressSync(
               [Buffer.from("m_vault")],
               extProgram
@@ -529,6 +551,68 @@ export class SolanaRoutes {
       key: this.programs.lut,
       state: AddressLookupTableAccount.deserialize(info!.data),
     });
+  }
+
+  static async createReleaseInboundMintInstruction<
+    N extends Network,
+    C extends SolanaChains
+  >(
+    ntt: SolanaNtt<N, C>,
+    args: {
+      payer: PublicKey;
+      chain: Chain;
+      nttMessage: Ntt.Message;
+      recipient: PublicKey;
+      revertWhenNotReady: boolean;
+    }
+  ): Promise<TransactionInstruction> {
+    const router = new SolanaRoutes(ntt);
+
+    // get target extension from ntt payload
+    const { additionalPayload } = args.nttMessage.payload;
+
+    if (additionalPayload.length < 40) {
+      throw new Error(
+        `Invalid additionalPayload length: ${additionalPayload.length}, expected at least 40 bytes`
+      );
+    }
+
+    const destinationMint = new PublicKey(
+      // first 8 bytes is the index, next 32 bytes is the mint address
+      additionalPayload.slice(8, 40)
+    );
+
+    // bridge to $M, use standard release instruction
+    if (destinationMint.equals(ntt.config!.mint)) {
+      return NTT.createReleaseInboundMintInstruction(
+        ntt.program,
+        ntt.config!,
+        args
+      );
+    }
+
+    const extPrograms = router.extPrograms[destinationMint.toBase58()];
+    if (!extPrograms) {
+      throw new Error(
+        `No extension program found for mint ${destinationMint.toBase58()}`
+      );
+    }
+
+    // TODO: will this exist?
+    const extAta = getAssociatedTokenAddressSync(
+      destinationMint,
+      args.recipient,
+      true,
+      extPrograms.tokenProgram
+    );
+
+    return router.getReleaseInboundMintExtensionIx(
+      args.nttMessage,
+      args.chain,
+      args.payer,
+      destinationMint,
+      extAta
+    );
   }
 }
 

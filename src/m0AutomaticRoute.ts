@@ -134,9 +134,9 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
         return this.EVM_CONTRACTS;
       case "Solana":
-        return new SolanaRoutes(chainContext.network).getSolanaContracts();
+        return SolanaRoutes.getSolanaContracts(chainContext);
       case "Fogo" as Chain:
-        return new SolanaRoutes(chainContext.network).getSolanaContracts();
+        return SolanaRoutes.getSolanaContracts(chainContext);
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -317,7 +317,6 @@ export class M0AutomaticRoute<N extends Network>
         : // for Solana use custom transfer instruction
           this.transferSolanaExtension(
             ntt as SolanaNtt<N, SolanaChains>,
-            request.fromChain.network,
             // @ts-ignore
             sender,
             transferAmount,
@@ -414,7 +413,6 @@ export class M0AutomaticRoute<N extends Network>
 
   async *transferSolanaExtension<N extends Network, C extends SolanaChains>(
     ntt: SolanaNtt<N, C>,
-    network: Network,
     sender: AccountAddress<C>,
     amount: bigint,
     recipient: ChainAddress,
@@ -422,9 +420,9 @@ export class M0AutomaticRoute<N extends Network>
     destinationToken: string,
     options: Ntt.TransferOptions
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    const router = new SolanaRoutes(network);
+    const router = new SolanaRoutes(ntt);
 
-    if (router.getSolanaContracts().token === sourceToken) {
+    if ((await ntt.getConfig()).mint.toBase58() === sourceToken) {
       return ntt.transfer(sender, amount, recipient, options);
     }
 
@@ -437,7 +435,6 @@ export class M0AutomaticRoute<N extends Network>
     // Use custom transfer instruction for extension tokens
     const ixs = [
       router.getTransferExtensionBurnIx(
-        ntt,
         amount,
         recipient,
         new PublicKey(sender.toUint8Array()),
