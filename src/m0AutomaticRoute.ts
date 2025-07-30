@@ -60,7 +60,7 @@ import {
   getAddressLookupTableAccounts,
   getSolanaContracts,
   getTransferExtensionBurnIx,
-} from "./svmInstructions";
+} from "./svm";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
