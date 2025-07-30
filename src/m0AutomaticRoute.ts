@@ -58,6 +58,7 @@ import {
 } from "@solana/web3.js";
 import {
   getAddressLookupTableAccounts,
+  getSolanaContracts,
   getTransferExtensionBurnIx,
 } from "./svmInstructions";
 
@@ -83,9 +84,6 @@ export class M0AutomaticRoute<N extends Network>
   // Wrapped M token address is the same on EVM chains
   static EVM_WRAPPED_M_TOKEN = "0x437cc33344a0B27A429f795ff6B469C72698B291";
 
-  static SOLANA_MAINNET_M_TOKEN = "mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo";
-  static SOLANA_TESTNET_M_TOKEN = "mzeroZRGCah3j5xEWp2Nih3GDejSBbH1rbHoxDg8By6";
-
   // Contract addresses are the same on all EVM chains
   static EVM_CONTRACTS: Contracts = {
     // M token address is the same on EVM chains
@@ -100,21 +98,6 @@ export class M0AutomaticRoute<N extends Network>
 
   static meta = { name: "M0AutomaticRoute", provider: "M0" };
 
-  static solanaContracts(network: Network): Contracts {
-    return {
-      token:
-        network == "Mainnet"
-          ? this.SOLANA_MAINNET_M_TOKEN
-          : this.SOLANA_TESTNET_M_TOKEN,
-      mLikeTokens: [
-        "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp", // wM
-      ],
-      manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
-      transceiver: { wormhole: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY" },
-      quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ",
-    };
-  }
-
   static supportedNetworks(): Network[] {
     return ["Mainnet", "Testnet"];
   }
@@ -126,9 +109,15 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Solana"];
+        return ["Ethereum", "Arbitrum", "Optimism", "Solana", "Fogo" as Chain];
       case "Testnet":
-        return ["Sepolia", "ArbitrumSepolia", "OptimismSepolia", "Solana"];
+        return [
+          "Sepolia",
+          "ArbitrumSepolia",
+          "OptimismSepolia",
+          "Solana",
+          "Fogo" as Chain,
+        ];
       default:
         throw new Error(`Unsupported network: ${network}`);
     }
@@ -149,7 +138,9 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
         return this.EVM_CONTRACTS;
       case "Solana":
-        return this.solanaContracts(chainContext.network);
+        return getSolanaContracts(chainContext.network);
+      case "Fogo" as Chain:
+        return getSolanaContracts(chainContext.network);
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -304,7 +295,7 @@ export class M0AutomaticRoute<N extends Network>
     const transferAmount = amount.units(params.normalizedParams.amount);
     const options = params.normalizedParams.options;
 
-    if (platform !== "Evm" && platform !== "Solana")
+    if (!M0AutomaticRoute.isPlatformSupported(platform))
       throw new Error(`Unsupported platform ${platform}`);
 
     const ntt = await fromChain.getProtocol("Ntt", {
@@ -330,6 +321,7 @@ export class M0AutomaticRoute<N extends Network>
         : // for Solana use custom transfer instruction
           this.transferSolanaExtension(
             ntt as SolanaNtt<N, SolanaChains>,
+            request.fromChain.network,
             // @ts-ignore
             sender,
             transferAmount,
@@ -426,6 +418,7 @@ export class M0AutomaticRoute<N extends Network>
 
   async *transferSolanaExtension<N extends Network, C extends SolanaChains>(
     ntt: SolanaNtt<N, C>,
+    network: Network,
     sender: AccountAddress<C>,
     amount: bigint,
     recipient: ChainAddress,
@@ -433,11 +426,7 @@ export class M0AutomaticRoute<N extends Network>
     destinationToken: string,
     options: Ntt.TransferOptions
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    if (
-      sourceToken === M0AutomaticRoute.SOLANA_MAINNET_M_TOKEN ||
-      sourceToken === M0AutomaticRoute.SOLANA_TESTNET_M_TOKEN
-    ) {
-      // TODO: add remaining accounts
+    if (getSolanaContracts(network).token === sourceToken) {
       return ntt.transfer(sender, amount, recipient, options);
     }
 
@@ -446,12 +435,12 @@ export class M0AutomaticRoute<N extends Network>
 
     const outboxItem = Keypair.generate();
     const payerAddress = new SolanaAddress(sender).unwrap();
-    const fromAuthority = payerAddress;
 
     // Use custom transfer instruction for extension tokens
     const ixs = [
       getTransferExtensionBurnIx(
         ntt,
+        network,
         amount,
         recipient,
         new PublicKey(sender.toUint8Array()),
@@ -504,7 +493,7 @@ export class M0AutomaticRoute<N extends Network>
     const luts: AddressLookupTableAccount[] = [];
     try {
       luts.push(await ntt.getAddressLookupTable());
-      luts.push(...(await getAddressLookupTableAccounts(ntt.connection)));
+      luts.push(await getAddressLookupTableAccounts(ntt.connection, network));
     } catch {}
 
     const messageV0 = new TransactionMessage({
