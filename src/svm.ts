@@ -1,4 +1,7 @@
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountInstruction,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   Connection,
@@ -565,7 +568,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
       recipient: PublicKey;
       revertWhenNotReady: boolean;
     }
-  ): Promise<TransactionInstruction> {
+  ): Promise<TransactionInstruction[]> {
     const router = new SolanaRoutes(ntt);
 
     // get target extension from ntt payload
@@ -584,11 +587,13 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
 
     // bridge to $M, use standard release instruction
     if (destinationMint.equals(ntt.config!.mint)) {
-      return NTT.createReleaseInboundMintInstruction(
-        ntt.program,
-        ntt.config!,
-        args
-      );
+      return [
+        await NTT.createReleaseInboundMintInstruction(
+          ntt.program,
+          ntt.config!,
+          args
+        ),
+      ];
     }
 
     const extPrograms = router.extPrograms[destinationMint.toBase58()];
@@ -598,7 +603,6 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
       );
     }
 
-    // TODO: will this exist?
     const extAta = getAssociatedTokenAddressSync(
       destinationMint,
       args.recipient,
@@ -606,13 +610,32 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
       extPrograms.tokenProgram
     );
 
-    return router.getReleaseInboundMintExtensionIx(
-      args.nttMessage,
-      args.chain,
-      args.payer,
-      destinationMint,
-      extAta
+    const ixs: TransactionInstruction[] = [];
+
+    const acctInfo = await ntt.connection.getAccountInfo(extAta);
+    if (acctInfo === null) {
+      ixs.push(
+        createAssociatedTokenAccountInstruction(
+          args.payer,
+          extAta,
+          args.recipient,
+          destinationMint,
+          extPrograms.tokenProgram
+        )
+      );
+    }
+
+    ixs.push(
+      router.getReleaseInboundMintExtensionIx(
+        args.nttMessage,
+        args.chain,
+        args.payer,
+        destinationMint,
+        extAta
+      )
     );
+
+    return ixs;
   }
 }
 
