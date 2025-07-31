@@ -587,13 +587,30 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
 
     // bridge to $M, use standard release instruction
     if (destinationMint.equals(ntt.config!.mint)) {
-      return [
-        await NTT.createReleaseInboundMintInstruction(
-          ntt.program,
-          ntt.config!,
-          args
-        ),
-      ];
+      const ix = await NTT.createReleaseInboundMintInstruction(
+        ntt.program,
+        ntt.config!,
+        args
+      );
+
+      // add extra accounts required for index propagation
+      ix.keys.push(
+        {
+          pubkey: router.programs.earn,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: PublicKey.findProgramAddressSync(
+            [Buffer.from("global")],
+            router.programs.earn
+          )[0],
+          isSigner: false,
+          isWritable: true,
+        }
+      );
+
+      return [ix];
     }
 
     const extPrograms = router.extPrograms[destinationMint.toBase58()];
