@@ -418,7 +418,8 @@ export class M0AutomaticRoute<N extends Network>
     recipient: ChainAddress,
     sourceToken: string,
     destinationToken: string,
-    options: Ntt.TransferOptions
+    options: Ntt.TransferOptions,
+    outboxItem?: Keypair
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
     const router = new SolanaRoutes(ntt);
 
@@ -429,7 +430,7 @@ export class M0AutomaticRoute<N extends Network>
     const config = await ntt.getConfig();
     if (config.paused) throw new Error("Contract is paused");
 
-    const outboxItem = Keypair.generate();
+    outboxItem = outboxItem ?? Keypair.generate();
     const payerAddress = new SolanaAddress(sender).unwrap();
 
     // Use custom transfer instruction for extension tokens
