@@ -517,12 +517,28 @@ export class M0AutomaticRoute<N extends Network>
     tx.feePayer = payerAddress;
     tx.add(...ixs);
 
-    // Pay fee to relay on destination chain
-    if (options.automatic) {
-      if (!ntt.quoter)
+    if (this.requiresExecutor(recipient.chain)) {
+      const quote = await this.getExecutorQuote(
+        ntt.network,
+        ntt.chain,
+        recipient.chain,
+        amount
+      );
+
+      tx.add(
+        router.getExecutorRelayIx(
+          payerAddress,
+          quote,
+          recipient.chain,
+          outboxItem.publicKey
+        )
+      );
+    } else if (options.automatic) {
+      if (!ntt.quoter) {
         throw new Error(
           "No quoter available, cannot initiate an automatic transfer."
         );
+      }
 
       const fee = await ntt.quoteDeliveryPrice(recipient.chain, options);
 

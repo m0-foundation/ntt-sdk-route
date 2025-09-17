@@ -19,7 +19,7 @@ import {
 import { SolanaChains } from "@wormhole-foundation/sdk-solana";
 import { NTT, SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
+import { Ntt, NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import BN from "bn.js";
 import { sha256 } from "@noble/hashes/sha2";
 
@@ -49,7 +49,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         swap: pk("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
         earn: pk("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
         lut: pk("9JLRqBqkznKiSoNfotA4ywSRdnWb2fE76SiFrAfkaRCD"),
-        mMint: pk("mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo"),
+        mMint: pk("mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"),
         portal: pk("mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY"),
         quoter: pk("Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"),
       },
@@ -57,7 +57,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         swap: pk("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
         earn: pk("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
         lut: pk("6GhuWPuAmiJeeSVsr58KjqHcAejJRndCx9BVtHkaYHUR"),
-        mMint: pk("mzeroZRGCah3j5xEWp2Nih3GDejSBbH1rbHoxDg8By6"),
+        mMint: pk("mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"),
         portal: pk("mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY"),
         quoter: pk("Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"),
       },
@@ -236,7 +236,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
             {
               amount: new BN(amount),
               recipientChain: {
-                id: 2, // Ethereum
+                id: chainToChainId(recipient.chain),
               },
               recipientAddress: [...Array(32)],
               shouldQueue: false,
@@ -356,6 +356,77 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         recipientAddress, // recipient_address
         destinationToken, // destination_token
         Buffer.from([Number(shouldQueue)]), // should_queue
+      ]),
+    });
+  }
+
+  getExecutorRelayIx(
+    sender: PublicKey,
+    quote: NttWithExecutor.Quote,
+    destinationChain: Chain,
+    outboxItem: PublicKey
+  ): TransactionInstruction {
+    const nttPeer = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("peer"),
+        new BN(chainToChainId(destinationChain)).toArrayLike(Buffer, "le", 2),
+      ],
+      this.programs.portal
+    )[0];
+
+    const signedQuoteBytes = Buffer.from(quote.signedQuote);
+    const relayInstructions = Buffer.from(quote.relayInstructions);
+
+    return new TransactionInstruction({
+      keys: [
+        {
+          pubkey: sender,
+          isSigner: true,
+          isWritable: true,
+        },
+        {
+          // payee
+          pubkey: new PublicKey(quote.payeeAddress),
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          // ntt_program_id
+          pubkey: this.programs.portal,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: nttPeer,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          // ntt_message
+          pubkey: outboxItem,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          // executor_program
+          pubkey: new PublicKey("execXUrAsMnqMmTHj5m7N1YQgsDz3cwGLYCYyuDRciV"),
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+      ],
+      programId: new PublicKey("nex1gkSWtRBheEJuQZMqHhbMG5A45qPU76KqnCZNVHR"),
+      data: Buffer.concat([
+        Buffer.from(sha256("global:relay_ntt_mesage").subarray(0, 8)),
+        new BN(chainToChainId(destinationChain)).toArrayLike(Buffer, "le", 2), // recipient_chain
+        new BN(signedQuoteBytes.length).toArrayLike(Buffer, "le", 4), // vec length
+        Buffer.from(signedQuoteBytes), // signed_quote_bytes
+        new BN(relayInstructions.length).toArrayLike(Buffer, "le", 4), // vec length
+        Buffer.from(relayInstructions), // relay_instructions
       ]),
     });
   }
