@@ -1,6 +1,7 @@
 import {
   createAssociatedTokenAccountInstruction,
   TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
@@ -12,7 +13,6 @@ import {
 import {
   Chain,
   ChainAddress,
-  ChainContext,
   chainToChainId,
   Network,
 } from "@wormhole-foundation/sdk-connect";
@@ -81,6 +81,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
           program: pk("extMahs9bUFMYcviKCvnSRaXgs5PcqmMzcnHRtTqE85"),
           tokenProgram: TOKEN_2022_PROGRAM_ID,
         },
+        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
+          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
       },
       Testnet: {
         mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
@@ -94,6 +98,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         usdkyPPxgV7sfNyKb8eDz66ogPrkRXG3wS2FVb6LLUf: {
           program: pk("3PskKTHgboCbUSQPMcCAZdZNFHbNvSoZ8zEFYANCdob7"),
           tokenProgram: TOKEN_2022_PROGRAM_ID,
+        },
+        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
+          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
+          tokenProgram: TOKEN_PROGRAM_ID,
         },
       },
     }[network];

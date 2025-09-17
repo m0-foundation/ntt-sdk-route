@@ -16,7 +16,10 @@ function getExecutorConfig(
 ): NttExecutorRoute.Config {
   const svmContracts = SolanaRoutes.getSolanaContracts(network);
   const svmChains: Chain[] = ["Solana", "Fogo"];
-  const evmChains: Chain[] = ["Ethereum", "Sepolia"];
+  const evmChains: Chain[] =
+    network === "Mainnet"
+      ? ["Ethereum", "Optimism", "Arbitrum"]
+      : ["Sepolia", "ArbitrumSepolia", "OptimismSepolia"];
 
   return {
     ntt: {

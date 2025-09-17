@@ -110,14 +110,14 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Solana", "Fogo" as Chain];
+        return ["Ethereum", "Arbitrum", "Optimism", "Solana", "Fogo"];
       case "Testnet":
         return [
           "Sepolia",
           "ArbitrumSepolia",
           "OptimismSepolia",
           "Solana",
-          "Fogo" as Chain,
+          "Fogo",
         ];
       default:
         throw new Error(`Unsupported network: ${network}`);
@@ -140,7 +140,7 @@ export class M0AutomaticRoute<N extends Network>
         return this.EVM_CONTRACTS;
       case "Solana":
         return SolanaRoutes.getSolanaContracts(chainContext.network);
-      case "Fogo" as Chain:
+      case "Fogo":
         return SolanaRoutes.getSolanaContracts(chainContext.network);
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
@@ -168,9 +168,14 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     const { token: mToken, mLikeTokens } = this.getContracts(toChain);
-    return [mToken, ...mLikeTokens].map((x) =>
-      Wormhole.tokenId(toChain.chain, x)
-    );
+    const tokens = mLikeTokens.map((x) => Wormhole.tokenId(toChain.chain, x));
+
+    // SVM chains cannot receive $M directly
+    if (toChain.chain === "Solana" || toChain.chain === "Fogo") {
+      return tokens;
+    }
+
+    return [...tokens, Wormhole.tokenId(toChain.chain, mToken)];
   }
 
   static isProtocolSupported<N extends Network>(
@@ -464,7 +469,8 @@ export class M0AutomaticRoute<N extends Network>
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
     const router = new SolanaRoutes(ntt);
 
-    if ((await ntt.getConfig()).mint.toBase58() === sourceToken) {
+    // Bridging from $M
+    if (SolanaRoutes.getSolanaContracts(ntt.network).token === sourceToken) {
       return ntt.transfer(sender, amount, recipient, options);
     }
 
