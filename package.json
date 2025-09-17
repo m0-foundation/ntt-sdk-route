@@ -23,12 +23,13 @@
   "scripts": {
     "build": "$npm_execpath tsup --clean",
     "clean": "rm -rf dist",
-    "test-bridge": "ts-node scripts/bridge.ts"
+    "test-bridge": "node --env-file=.env -r ts-node/register scripts/bridge.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.28.1",
     "@types/bn.js": "^5.2.0",
     "@types/node": "~20.17.17",
+    "ts-node": "^10.9.2",
     "tsup": "~8.3.6",
     "typescript": "~5.6.3"
   },

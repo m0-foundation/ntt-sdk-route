@@ -16,7 +16,6 @@ import "@wormhole-foundation/sdk-evm-ntt";
 import evmLoader from "@wormhole-foundation/sdk/evm";
 import solanaLoader from "@wormhole-foundation/sdk/solana";
 import "@wormhole-foundation/sdk-solana-ntt";
-import "dotenv/config";
 import { M0AutomaticRoute } from "../src/m0AutomaticRoute";
 
 const wM = {
@@ -24,25 +23,31 @@ const wM = {
   Sepolia: "0x437cc33344a0B27A429f795ff6B469C72698B291",
 };
 
-/// SCRIPT PARAMS ///
-const network: Network = "Testnet";
-const amount = 1_000_000n;
-const sourceChain: Chain = "Solana";
-const destinationChain: Chain = "Sepolia";
-const sourceToken = wM[sourceChain];
-const destinationToken = wM[destinationChain];
+(async () => {
+  const sourceChain = "Solana";
+  const destinationChain = "Sepolia";
 
-async function bridge(
-  network: Network,
-  sourceChain: Chain,
-  sourceToken: string,
-  destinationChain: Chain,
-  destinationToken: string,
-  amount: bigint
-) {
-  const wh = await wormhole(network, [evmLoader, solanaLoader]);
-  const src = wh.getChain(sourceChain);
-  const dst = wh.getChain(destinationChain);
+  await bridge({
+    network: "Testnet",
+    sourceChain,
+    sourceToken: wM[sourceChain],
+    destinationChain,
+    destinationToken: wM[destinationChain],
+    amount: "0.1",
+  });
+})();
+
+async function bridge(params: {
+  network: Network;
+  sourceChain: Chain;
+  sourceToken: string;
+  destinationChain: Chain;
+  destinationToken: string;
+  amount: string;
+}) {
+  const wh = await wormhole(params.network, [evmLoader, solanaLoader]);
+  const src = wh.getChain(params.sourceChain);
+  const dst = wh.getChain(params.destinationChain);
 
   // get signers from env
   const srcSigner = await getSigner(src);
@@ -50,8 +55,11 @@ async function bridge(
   const resolver = wh.resolver([M0AutomaticRoute]);
 
   const tr = await routes.RouteTransferRequest.create(wh, {
-    source: Wormhole.tokenId(sourceChain, sourceToken),
-    destination: Wormhole.tokenId(destinationChain, destinationToken),
+    source: Wormhole.tokenId(params.sourceChain, params.sourceToken),
+    destination: Wormhole.tokenId(
+      params.destinationChain,
+      params.destinationToken
+    ),
   });
 
   // resolve the transfer request to a set of routes that can perform it
@@ -59,7 +67,7 @@ async function bridge(
   const route = foundRoutes[0];
 
   const validated = await route.validate(tr, {
-    amount: amount.toString(),
+    amount: params.amount,
     options: route.getDefaultOptions(),
   });
   if (!validated.valid) throw validated.error;
@@ -75,7 +83,7 @@ async function bridge(
   );
 
   // track the transfer until the destination is initiated
-  await routes.checkAndCompleteTransfer(route, receipt, dstSigner.signer);
+  console.log("Initiated transfer: ", receipt);
 }
 
 async function getSigner<N extends Network, C extends Chain>(
@@ -105,14 +113,3 @@ async function getSigner<N extends Network, C extends Chain>(
     address: Wormhole.chainAddress(chain.chain, signer.address()),
   };
 }
-
-(async () => {
-  await bridge(
-    network,
-    sourceChain,
-    sourceToken,
-    destinationChain,
-    destinationToken,
-    amount
-  );
-})();

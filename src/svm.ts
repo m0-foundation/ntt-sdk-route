@@ -150,6 +150,17 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
 
     const { program: extProgram, tokenProgram: extTokenProgram } = extension;
 
+    const [tokenAuth] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_authority")],
+      this.programs.portal
+    );
+    const sessionAuth = this.ntt.pdas.sessionAuthority(tokenAuth, {
+      amount: new BN(amount),
+      recipientChain: { id: chainToChainId(recipient.chain) },
+      recipientAddress: [...recipientAddress],
+      shouldQueue,
+    });
+
     return new TransactionInstruction({
       programId: this.ntt.program.programId,
       keys: [
@@ -174,10 +185,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
           // from (token auth m token account)
           pubkey: getAssociatedTokenAddressSync(
             this.programs.mMint,
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("token_authority")],
-              this.ntt.program.programId
-            )[0],
+            tokenAuth,
             true,
             TOKEN_2022_PROGRAM_ID
           ),
@@ -228,29 +236,13 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         },
         {
           // session auth
-          pubkey: this.ntt.pdas.sessionAuthority(
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("token_authority")],
-              this.programs.portal
-            )[0],
-            {
-              amount: new BN(amount),
-              recipientChain: {
-                id: chainToChainId(recipient.chain),
-              },
-              recipientAddress: [...Array(32)],
-              shouldQueue: false,
-            }
-          ),
+          pubkey: sessionAuth,
           isSigner: false,
           isWritable: false,
         },
         {
           // token auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("token_authority")],
-            this.ntt.program.programId
-          )[0],
+          pubkey: tokenAuth,
           isSigner: false,
           isWritable: false,
         },
