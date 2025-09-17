@@ -100,14 +100,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
   }
 
   static getSolanaContracts(
-    chainContext: ChainContext<Network>
+    network: Network
   ): Ntt.Contracts & { mLikeTokens: string[] } {
-    const programs = SolanaRoutes.getPrograms(
-      chainContext.network as SvmNetwork
-    );
-    const extPrograms = SolanaRoutes.getExtPrograms(
-      chainContext.network as SvmNetwork
-    );
+    const programs = SolanaRoutes.getPrograms(network as SvmNetwork);
+    const extPrograms = SolanaRoutes.getExtPrograms(network as SvmNetwork);
 
     return {
       token: programs.mMint.toBase58(),
