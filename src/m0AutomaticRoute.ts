@@ -39,7 +39,11 @@ import {
   EvmUnsignedTransaction,
 } from "@wormhole-foundation/sdk-evm";
 import "@wormhole-foundation/sdk-solana";
-import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
+import {
+  nttExecutorRoute,
+  NttExecutorRoute,
+  NttRoute,
+} from "@wormhole-foundation/sdk-route-ntt";
 import { Contract, TransactionRequest } from "ethers";
 import { Ntt, NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
@@ -59,7 +63,7 @@ import {
 import { SolanaRoutes } from "./svm";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
-import { getExectorRoute } from "./executor";
+import { getExecutorConfig } from "./executor";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -638,7 +642,7 @@ export class M0AutomaticRoute<N extends Network>
     amount: bigint
   ): Promise<NttWithExecutor.Quote> {
     const wh = new Wormhole(network, [solana.Platform, evm.Platform]);
-    const executorRoute = getExectorRoute(network);
+    const executorRoute = nttExecutorRoute(getExecutorConfig(network));
     const routeInstance = new executorRoute(wh);
 
     const resolveM = (chain: Chain) => {

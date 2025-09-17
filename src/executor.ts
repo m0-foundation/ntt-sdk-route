@@ -7,11 +7,7 @@ import {
 import { SolanaRoutes } from "./svm";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
 
-export function getExectorRoute(network: Network = "Mainnet") {
-  return nttExecutorRoute(getExecutorConfig(network));
-}
-
-function getExecutorConfig(
+export function getExecutorConfig(
   network: Network = "Mainnet"
 ): NttExecutorRoute.Config {
   const svmContracts = SolanaRoutes.getSolanaContracts(network);
