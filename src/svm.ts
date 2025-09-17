@@ -17,17 +17,9 @@ import {
   Network,
 } from "@wormhole-foundation/sdk-connect";
 import { SolanaChains } from "@wormhole-foundation/sdk-solana";
-import {
-  IdlVersion,
-  NTT,
-  NttBindings,
-  SolanaNtt,
-} from "@wormhole-foundation/sdk-solana-ntt";
+import { NTT, SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import {
-  Ntt,
-  WormholeNttTransceiver,
-} from "@wormhole-foundation/sdk-definitions-ntt";
+import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
 import BN from "bn.js";
 import { sha256 } from "@noble/hashes/sha2";
 
@@ -232,14 +224,20 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         },
         {
           // session auth
-          pubkey: this.ntt.pdas.sessionAuthority(payer, {
-            amount: new BN(amount),
-            recipientChain: {
-              id: 2, // Ethereum
-            },
-            recipientAddress: [...Array(32)],
-            shouldQueue: false,
-          }),
+          pubkey: this.ntt.pdas.sessionAuthority(
+            PublicKey.findProgramAddressSync(
+              [Buffer.from("token_authority")],
+              this.programs.portal
+            )[0],
+            {
+              amount: new BN(amount),
+              recipientChain: {
+                id: 2, // Ethereum
+              },
+              recipientAddress: [...Array(32)],
+              shouldQueue: false,
+            }
+          ),
           isSigner: false,
           isWritable: false,
         },

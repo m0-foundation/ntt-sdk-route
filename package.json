@@ -39,15 +39,22 @@
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.2",
-    "@wormhole-foundation/sdk": "^1.7.0",
-    "@wormhole-foundation/sdk-connect": "^1.7.0",
-    "@wormhole-foundation/sdk-definitions-ntt": "^0.7.1",
-    "@wormhole-foundation/sdk-evm": "^1.7.0",
-    "@wormhole-foundation/sdk-evm-ntt": "^0.7.1",
-    "@wormhole-foundation/sdk-route-ntt": "^0.7.1",
-    "@wormhole-foundation/sdk-solana": "^1.7.0",
-    "@wormhole-foundation/sdk-solana-ntt": "^0.7.1",
+    "@wormhole-foundation/sdk": "3.4.7",
+    "@wormhole-foundation/sdk-connect": "3.4.7",
+    "@wormhole-foundation/sdk-definitions-ntt": "2.0.5",
+    "@wormhole-foundation/sdk-evm": "3.4.7",
+    "@wormhole-foundation/sdk-evm-ntt": "2.0.5",
+    "@wormhole-foundation/sdk-route-ntt": "2.0.5",
+    "@wormhole-foundation/sdk-solana": "3.4.7",
+    "@wormhole-foundation/sdk-solana-ntt": "2.0.5",
     "bn.js": "^5.2.2",
     "ethers": "^6.5.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@wormhole-foundation/sdk": "3.4.7",
+      "@wormhole-foundation/sdk-base": "3.4.7",
+      "@wormhole-foundation/sdk-definitions": "3.4.7"
+    }
   }
 }
