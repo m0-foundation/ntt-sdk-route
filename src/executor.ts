@@ -53,12 +53,12 @@ export function getExecutorConfig(
         // so we need to override the gas cost
         Solana: {
           [svmContracts.token]: {
-            msgValue: 20_000_000n,
+            msgValue: 15_000_000n,
           },
         },
         Fogo: {
           [svmContracts.token]: {
-            msgValue: 20_000_000n,
+            msgValue: 15_000_000n,
           },
         },
       },

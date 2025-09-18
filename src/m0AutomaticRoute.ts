@@ -356,8 +356,6 @@ export class M0AutomaticRoute<N extends Network>
     options: Ntt.TransferOptions
   ): AsyncGenerator<EvmUnsignedTransaction<N, C>> {
     const senderAddress = new EvmAddress(sender).toString();
-    // Note: these flags are indexed by transceiver index
-    const totalPrice = await ntt.quoteDeliveryPrice(destination.chain, options);
 
     //TODO check for ERC-2612 (permit) support on token?
     const tokenContract = EvmPlatform.getTokenImplementation(
@@ -419,7 +417,7 @@ export class M0AutomaticRoute<N extends Network>
           receiver,
           executorArgs,
           Uint8Array.from(Buffer.from("01000101", "hex")),
-          { value: totalPrice + quote.estimatedCost }
+          { value: quote.estimatedCost }
         );
 
       yield ntt.createUnsignedTx(addFrom(txReq, senderAddress), "Ntt.transfer");
@@ -438,7 +436,7 @@ export class M0AutomaticRoute<N extends Network>
         toUniversal(destination.chain, destinationToken).toString(),
         receiver,
         receiver,
-        { value: totalPrice }
+        { value: await ntt.quoteDeliveryPrice(destination.chain, options) }
       );
 
     yield ntt.createUnsignedTx(addFrom(txReq, senderAddress), "Ntt.transfer");
