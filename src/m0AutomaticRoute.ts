@@ -131,21 +131,18 @@ export class M0AutomaticRoute<N extends Network>
   static getContracts(chainContext: ChainContext<Network>): Contracts {
     switch (chainContext.chain) {
       case "Ethereum":
-        return this.EVM_CONTRACTS;
       case "Optimism":
-        return this.EVM_CONTRACTS;
       case "Arbitrum":
-        return this.EVM_CONTRACTS;
       case "Sepolia":
-        return this.EVM_CONTRACTS;
       case "OptimismSepolia":
-        return this.EVM_CONTRACTS;
       case "ArbitrumSepolia":
         return this.EVM_CONTRACTS;
       case "Solana":
-        return SolanaRoutes.getSolanaContracts(chainContext.network);
       case "Fogo":
-        return SolanaRoutes.getSolanaContracts(chainContext.network);
+        return SolanaRoutes.getSolanaContracts(
+          chainContext.network,
+          chainContext.chain
+        );
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -426,6 +423,7 @@ export class M0AutomaticRoute<N extends Network>
         );
 
       yield ntt.createUnsignedTx(addFrom(txReq, senderAddress), "Ntt.transfer");
+      return;
     }
 
     const contract = new Contract(ntt.managerAddress, [
@@ -474,7 +472,7 @@ export class M0AutomaticRoute<N extends Network>
     const router = new SolanaRoutes(ntt);
 
     // Bridging from $M
-    if (SolanaRoutes.getSolanaContracts(ntt.network).token === sourceToken) {
+    if (router.getSolanaContracts().token === sourceToken) {
       return ntt.transfer(sender, amount, recipient, options);
     }
 
@@ -662,8 +660,10 @@ export class M0AutomaticRoute<N extends Network>
     const routeInstance = new executorRoute(wh);
 
     const resolveM = (chain: Chain) => {
-      if (chain === "Solana" || chain === "Fogo")
-        return SolanaRoutes.getSolanaContracts(network).token;
+      if (chainToPlatform(chain) === "Solana") {
+        const c = chain as SolanaChains;
+        return SolanaRoutes.getSolanaContracts(network, c).token;
+      }
       return M0AutomaticRoute.EVM_CONTRACTS.token;
     };
 
@@ -689,6 +689,7 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   private requiresExecutor(destination: Chain): boolean {
-    return destination === "Solana" || destination === "Fogo";
+    // Other SVM chains like Fogo are marked as Solana
+    return chainToPlatform(destination) === "Solana";
   }
 }

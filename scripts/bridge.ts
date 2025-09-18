@@ -24,8 +24,8 @@ const wM = {
 };
 
 (async () => {
-  const sourceChain = "Solana";
-  const destinationChain = "Sepolia";
+  const sourceChain = "Sepolia";
+  const destinationChain = "Solana";
 
   await bridge({
     network: "Testnet",
@@ -82,7 +82,6 @@ async function bridge(params: {
     dstSigner.address
   );
 
-  // track the transfer until the destination is initiated
   console.log("Initiated transfer: ", receipt);
 }
 

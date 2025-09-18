@@ -40,7 +40,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
     this.ntt = ntt;
     this.network = ntt.network as SvmNetwork;
     this.programs = SolanaRoutes.getPrograms(this.network);
-    this.extPrograms = SolanaRoutes.getExtPrograms(this.network);
+    this.extPrograms = SolanaRoutes.getExtPrograms(
+      this.network,
+      this.ntt.chain
+    );
   }
 
   private static getPrograms(network: SvmNetwork): Record<string, PublicKey> {
@@ -65,8 +68,19 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
   }
 
   private static getExtPrograms(
-    network: SvmNetwork
+    network: SvmNetwork,
+    chain: SolanaChains
   ): Record<string, ExtensionDetails> {
+    if (chain === "Fogo") {
+      // Fogo addresses the same for devnet and mainnet
+      return {
+        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
+          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      };
+    }
+
     return {
       Mainnet: {
         mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
@@ -80,10 +94,6 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         usdkyPPxgV7sfNyKb8eDz66ogPrkRXG3wS2FVb6LLUf: {
           program: pk("extMahs9bUFMYcviKCvnSRaXgs5PcqmMzcnHRtTqE85"),
           tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
-          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
-          tokenProgram: TOKEN_PROGRAM_ID,
         },
       },
       Testnet: {
@@ -99,19 +109,19 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
           program: pk("3PskKTHgboCbUSQPMcCAZdZNFHbNvSoZ8zEFYANCdob7"),
           tokenProgram: TOKEN_2022_PROGRAM_ID,
         },
-        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
-          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
-          tokenProgram: TOKEN_PROGRAM_ID,
-        },
       },
     }[network];
   }
 
   static getSolanaContracts(
-    network: Network
+    network: Network,
+    chain: SolanaChains
   ): Ntt.Contracts & { mLikeTokens: string[] } {
     const programs = SolanaRoutes.getPrograms(network as SvmNetwork);
-    const extPrograms = SolanaRoutes.getExtPrograms(network as SvmNetwork);
+    const extPrograms = SolanaRoutes.getExtPrograms(
+      network as SvmNetwork,
+      chain
+    );
 
     return {
       token: programs.mMint.toBase58(),
@@ -120,6 +130,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
       transceiver: { wormhole: programs.portal.toBase58() },
       quoter: programs.quoter.toBase58(),
     };
+  }
+
+  getSolanaContracts(): Ntt.Contracts & { mLikeTokens: string[] } {
+    return SolanaRoutes.getSolanaContracts(this.network, this.ntt.chain);
   }
 
   getTransferExtensionBurnIx(

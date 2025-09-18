@@ -1,16 +1,14 @@
-import { Chain, Network } from "@wormhole-foundation/sdk-connect";
-import {
-  nttExecutorRoute,
-  NttExecutorRoute,
-  NttRoute,
-} from "@wormhole-foundation/sdk-route-ntt";
+import { chain, Chain, Network } from "@wormhole-foundation/sdk-connect";
+import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { SolanaRoutes } from "./svm";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
 
 export function getExecutorConfig(
   network: Network = "Mainnet"
 ): NttExecutorRoute.Config {
-  const svmContracts = SolanaRoutes.getSolanaContracts(network);
+  // core programs the same for Fogo and Solana
+  const svmContracts = SolanaRoutes.getSolanaContracts(network, "Solana");
+
   const svmChains: Chain[] = ["Solana", "Fogo"];
   const evmChains: Chain[] =
     network === "Mainnet"
@@ -54,18 +52,12 @@ export function getExecutorConfig(
         // SVM chains require extra compute when receiving messages
         // so we need to override the gas cost
         Solana: {
-          mzeroZRGCah3j5xEWp2Nih3GDejSBbH1rbHoxDg8By6: {
-            msgValue: 20_000_000n,
-          },
-          mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo: {
+          [svmContracts.token]: {
             msgValue: 20_000_000n,
           },
         },
         Fogo: {
-          mzeroZRGCah3j5xEWp2Nih3GDejSBbH1rbHoxDg8By6: {
-            msgValue: 20_000_000n,
-          },
-          mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo: {
+          [svmContracts.token]: {
             msgValue: 20_000_000n,
           },
         },
