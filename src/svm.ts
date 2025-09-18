@@ -15,6 +15,7 @@ import {
   ChainAddress,
   chainToChainId,
   Network,
+  toUniversal,
 } from "@wormhole-foundation/sdk-connect";
 import { SolanaChains } from "@wormhole-foundation/sdk-solana";
 import { NTT, SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
@@ -145,10 +146,16 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
     destinationToken: Uint8Array,
     shouldQueue = true
   ): TransactionInstruction {
-    const recipientAddress = Buffer.alloc(32);
-    const dest = Buffer.from(recipient.address.toUint8Array());
-    dest.copy(recipientAddress, 12);
+    const recipientAddress = toUniversal(
+      recipient.chain,
+      recipient.address.toString()
+    ).toUint8Array();
 
+    if (recipientAddress.length !== 32) {
+      throw new Error(
+        `recipient address must be 32 bytes, got ${recipientAddress.length} bytes`
+      );
+    }
     if (destinationToken.length !== 32) {
       throw new Error(
         `destinationToken must be 32 bytes, got ${destinationToken.length} bytes`
