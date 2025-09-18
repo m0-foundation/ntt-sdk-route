@@ -147,7 +147,7 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
   ): TransactionInstruction {
     const recipientAddress = Buffer.alloc(32);
     const dest = Buffer.from(recipient.address.toUint8Array());
-    dest.copy(recipientAddress);
+    dest.copy(recipientAddress, 12);
 
     if (destinationToken.length !== 32) {
       throw new Error(
@@ -360,8 +360,8 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
         new BN(amount).toArrayLike(Buffer, "le", 8), // amount
         new BN(chainToChainId(recipient.chain)).toArrayLike(Buffer, "le", 2), // chain_id
         recipientAddress, // recipient_address
-        destinationToken, // destination_token
         Buffer.from([Number(shouldQueue)]), // should_queue
+        destinationToken, // destination_token
       ]),
     });
   }
