@@ -522,12 +522,7 @@ export class M0AutomaticRoute<N extends Network>
       );
 
       tx.add(
-        router.getExecutorRelayIx(
-          payerAddress,
-          quote,
-          recipient.chain,
-          outboxItem.publicKey
-        )
+        await router.getExecutorRelayIx(payerAddress, quote, recipient.chain)
       );
     } else if (options.automatic) {
       if (!ntt.quoter) {
