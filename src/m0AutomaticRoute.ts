@@ -472,6 +472,7 @@ export class M0AutomaticRoute<N extends Network>
     // Bridging from $M
     if (router.getSolanaContracts().token === sourceToken) {
       yield* ntt.transfer(sender, amount, recipient, options);
+      return;
     }
 
     const config = await ntt.getConfig();
