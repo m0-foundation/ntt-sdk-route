@@ -425,7 +425,7 @@ export class M0AutomaticRoute<N extends Network>
     }
 
     const contract = new Contract(ntt.managerAddress, [
-      "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress) external payable returns (uint64 sequence)",
+      "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress, bytes memory transceiverInstructions) external payable returns (uint64 sequence)",
     ]);
     const txReq = await contract
       .getFunction("transferMLikeToken")
@@ -436,6 +436,7 @@ export class M0AutomaticRoute<N extends Network>
         toUniversal(destination.chain, destinationToken).toString(),
         receiver,
         receiver,
+        [],
         { value: await ntt.quoteDeliveryPrice(destination.chain, options) }
       );
 
