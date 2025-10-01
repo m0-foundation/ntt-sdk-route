@@ -436,7 +436,7 @@ export class M0AutomaticRoute<N extends Network>
         toUniversal(destination.chain, destinationToken).toString(),
         receiver,
         receiver,
-        Uint8Array.from([]),
+        Uint8Array.from(Buffer.from("00", "hex")),
         { value: await ntt.quoteDeliveryPrice(destination.chain, options) }
       );
 
