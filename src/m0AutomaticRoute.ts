@@ -87,7 +87,7 @@ export class M0AutomaticRoute<N extends Network>
   // Wrapped M token address is the same on EVM chains
   static EVM_WRAPPED_M_TOKEN = "0x437cc33344a0B27A429f795ff6B469C72698B291";
 
-  static EXECUTOR_ENTRYPOINT = "0x8518040a9cf9dfb55a4f099bb0eaabeefeb03643";
+  static EXECUTOR_ENTRYPOINT = "0x22f04a6cd935bfa3b4d000a4e3d4079adb148198";
 
   // Contract addresses are the same on all EVM chains
   static EVM_CONTRACTS: Contracts = {
