@@ -389,7 +389,6 @@ export class M0AutomaticRoute<N extends Network>
     // Request relay through executor
     if (this.requiresExecutor(destination.chain)) {
       const quote = await this.getExecutorQuote(
-        ntt.network,
         ntt.chain,
         destination.chain,
         amount
@@ -517,7 +516,6 @@ export class M0AutomaticRoute<N extends Network>
 
     if (this.requiresExecutor(recipient.chain)) {
       const quote = await this.getExecutorQuote(
-        ntt.network,
         ntt.chain,
         recipient.chain,
         amount
@@ -645,24 +643,22 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   private async getExecutorQuote(
-    network: Network,
     sourceChain: Chain,
     destinationChain: Chain,
     amount: bigint
   ): Promise<NttWithExecutor.Quote> {
-    const wh = new Wormhole(network, [solana.Platform, evm.Platform]);
-    const executorRoute = nttExecutorRoute(getExecutorConfig(network));
-    const routeInstance = new executorRoute(wh);
+    const executorRoute = nttExecutorRoute(getExecutorConfig(this.wh.network));
+    const routeInstance = new executorRoute(this.wh);
 
     const resolveM = (chain: Chain) => {
       if (chainToPlatform(chain) === "Solana") {
         const c = chain as SolanaChains;
-        return SolanaRoutes.getSolanaContracts(network, c).token;
+        return SolanaRoutes.getSolanaContracts(this.wh.network, c).token;
       }
       return M0AutomaticRoute.EVM_CONTRACTS.token;
     };
 
-    const transferRequest = await routes.RouteTransferRequest.create(wh, {
+    const transferRequest = await routes.RouteTransferRequest.create(this.wh, {
       source: Wormhole.tokenId(sourceChain, resolveM(sourceChain)),
       destination: Wormhole.tokenId(
         destinationChain,
