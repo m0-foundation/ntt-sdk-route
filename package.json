@@ -1,6 +1,6 @@
 {
   "name": "@m0-foundation/ntt-sdk-route",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,7 +36,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "packageManager": "pnpm@10.2.0",
+  "packageManager": "pnpm@10.18.3",
   "dependencies": {
     "@noble/hashes": "^1.8.0",
     "@solana/spl-token": "^0.4.13",
