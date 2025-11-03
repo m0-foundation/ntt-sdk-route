@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.23
+
+### Patch Changes
+
+- da80aa6: Base and BaseSepolia support
+
 ## 0.0.9
 
 ### Patch Changes
