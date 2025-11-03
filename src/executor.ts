@@ -12,8 +12,8 @@ export function getExecutorConfig(
   const svmChains: Chain[] = ["Solana", "Fogo"];
   const evmChains: Chain[] =
     network === "Mainnet"
-      ? ["Ethereum", "Optimism", "Arbitrum"]
-      : ["Sepolia", "ArbitrumSepolia", "OptimismSepolia"];
+      ? ["Ethereum", "Optimism", "Arbitrum", "Base"]
+      : ["Sepolia", "ArbitrumSepolia", "OptimismSepolia", "BaseSepolia"];
 
   return {
     ntt: {

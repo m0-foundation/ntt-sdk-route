@@ -117,12 +117,13 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Solana", "Fogo"];
+        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana", "Fogo"];
       case "Testnet":
         return [
           "Sepolia",
           "ArbitrumSepolia",
           "OptimismSepolia",
+          "BaseSepolia",
           "Solana",
           "Fogo",
         ];
@@ -136,9 +137,11 @@ export class M0AutomaticRoute<N extends Network>
       case "Ethereum":
       case "Optimism":
       case "Arbitrum":
+      case "Base":
       case "Sepolia":
       case "OptimismSepolia":
       case "ArbitrumSepolia":
+      case "BaseSepolia":
         return this.EVM_CONTRACTS;
       case "Solana":
       case "Fogo":
