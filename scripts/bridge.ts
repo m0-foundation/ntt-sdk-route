@@ -24,15 +24,15 @@ const wM = {
 };
 
 (async () => {
-  const sourceChain = "Sepolia";
+  const sourceChain = "Ethereum";
   const destinationChain = "Solana";
 
   await bridge({
-    network: "Testnet",
+    network: "Mainnet",
     sourceChain,
-    sourceToken: wM[sourceChain],
+    sourceToken: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
     destinationChain,
-    destinationToken: wM[destinationChain],
+    destinationToken: "xoUSD7HdezER6vVPbYETEpPR3G7CsCgzWioiDezxDsg",
     amount: "0.1",
   });
 })();

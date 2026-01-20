@@ -96,6 +96,10 @@ export class SolanaRoutes<N extends Network, C extends SolanaChains> {
           program: pk("extMahs9bUFMYcviKCvnSRaXgs5PcqmMzcnHRtTqE85"),
           tokenProgram: TOKEN_2022_PROGRAM_ID,
         },
+        xoUSD7HdezER6vVPbYETEpPR3G7CsCgzWioiDezxDsg: {
+          program: pk("mexteGyWXgUR65XepNKtLJ2H66MmyLWrDSeA1bqzZ4C"),
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+        },
       },
       Testnet: {
         mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
