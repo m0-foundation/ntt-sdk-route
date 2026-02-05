@@ -26,9 +26,9 @@
     "test-bridge": "node --env-file=.env -r ts-node/register scripts/bridge.ts"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.28.1",
+    "@changesets/cli": "^2.29.8",
     "@types/bn.js": "^5.2.0",
-    "@types/node": "~20.17.17",
+    "@types/node": "~20.17.58",
     "ts-node": "^10.9.2",
     "tsup": "~8.3.6",
     "typescript": "~5.6.3"
@@ -39,24 +39,24 @@
   "packageManager": "pnpm@10.18.3",
   "dependencies": {
     "@noble/hashes": "^1.8.0",
-    "@solana/spl-token": "^0.4.13",
-    "@solana/web3.js": "^1.98.2",
-    "@wormhole-foundation/sdk": "3.4.7",
-    "@wormhole-foundation/sdk-connect": "3.4.7",
-    "@wormhole-foundation/sdk-definitions-ntt": "2.0.5",
-    "@wormhole-foundation/sdk-evm": "3.4.7",
-    "@wormhole-foundation/sdk-evm-ntt": "2.0.5",
-    "@wormhole-foundation/sdk-route-ntt": "2.0.5",
-    "@wormhole-foundation/sdk-solana": "3.4.7",
-    "@wormhole-foundation/sdk-solana-ntt": "2.0.5",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "@wormhole-foundation/sdk": "4.9.1",
+    "@wormhole-foundation/sdk-connect": "4.9.1",
+    "@wormhole-foundation/sdk-definitions-ntt": "4.0.12",
+    "@wormhole-foundation/sdk-evm": "4.9.1",
+    "@wormhole-foundation/sdk-evm-ntt": "4.0.12",
+    "@wormhole-foundation/sdk-route-ntt": "4.0.12",
+    "@wormhole-foundation/sdk-solana": "4.9.1",
+    "@wormhole-foundation/sdk-solana-ntt": "4.0.12",
     "bn.js": "^5.2.2",
-    "ethers": "^6.5.1"
+    "ethers": "^6.16.0"
   },
   "pnpm": {
     "overrides": {
-      "@wormhole-foundation/sdk": "3.4.7",
-      "@wormhole-foundation/sdk-base": "3.4.7",
-      "@wormhole-foundation/sdk-definitions": "3.4.7"
+      "@wormhole-foundation/sdk": "4.9.1",
+      "@wormhole-foundation/sdk-base": "4.9.1",
+      "@wormhole-foundation/sdk-definitions": "4.9.1"
     }
   }
 }
