@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.24
+
+### Patch Changes
+
+- 81a6135: bump dependencies
+
 ## 0.0.23
 
 ### Patch Changes
