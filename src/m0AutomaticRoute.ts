@@ -27,9 +27,12 @@ import {
   toUniversal,
   universalAddress,
 } from "@wormhole-foundation/sdk-connect";
-import "@wormhole-foundation/sdk-definitions-ntt";
+import { register as registerNttDefinitions } from "@wormhole-foundation/sdk-definitions-ntt";
+import { register as registerEvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
+import { register as registerSolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 import { EvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
 import { SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
+
 import {
   addChainId,
   addFrom,
@@ -81,6 +84,13 @@ export class M0AutomaticRoute<N extends Network>
   extends routes.AutomaticRoute<N, Op, Vp, R>
   implements routes.StaticRouteMethods<typeof M0AutomaticRoute>
 {
+  static {
+    // Register NTT protocol handlers with the SDK
+    registerNttDefinitions();
+    registerEvmNtt();
+    registerSolanaNtt();
+  }
+
   // ntt does not support gas drop-off currently
   static NATIVE_GAS_DROPOFF_SUPPORTED: boolean = false;
 
