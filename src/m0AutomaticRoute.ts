@@ -56,6 +56,7 @@ import {
 } from "@wormhole-foundation/sdk-solana";
 import {
   AddressLookupTableAccount,
+  Connection,
   Keypair,
   LAMPORTS_PER_SOL,
   TransactionMessage,
@@ -63,6 +64,11 @@ import {
   Transaction,
   PublicKey,
 } from "@solana/web3.js";
+import {
+  getScaledUiAmountConfig,
+  TOKEN_2022_PROGRAM_ID,
+  unpackMint,
+} from "@solana/spl-token";
 import { SolanaRoutes } from "./svm";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
@@ -496,6 +502,14 @@ export class M0AutomaticRoute<N extends Network>
 
     outboxItem = outboxItem ?? Keypair.generate();
     const payerAddress = new SolanaAddress(sender).unwrap();
+    const sourceMint = new PublicKey(sourceToken);
+
+    // Convert principal amount to UI amount if mint has scaled-ui config
+    amount = await M0AutomaticRoute.applyScaledUiMultiplier(
+      ntt.connection,
+      sourceMint,
+      amount,
+    );
 
     // Use custom transfer instruction for extension tokens
     const ixs = [
@@ -504,7 +518,7 @@ export class M0AutomaticRoute<N extends Network>
         recipient,
         new PublicKey(sender.toUint8Array()),
         outboxItem.publicKey,
-        new PublicKey(sourceToken),
+        sourceMint,
         toUniversal(recipient.chain, destinationToken).toUint8Array(),
         options.queue,
       ),
@@ -698,5 +712,35 @@ export class M0AutomaticRoute<N extends Network>
   private requiresExecutor(destination: Chain): boolean {
     // Other SVM chains like Fogo are marked as Solana
     return chainToPlatform(destination) === "Solana";
+  }
+
+  static async applyScaledUiMultiplier(
+    connection: Connection,
+    mint: PublicKey,
+    amount: bigint,
+  ): Promise<bigint> {
+    const mintAccountInfo = await connection.getAccountInfo(mint);
+    if (
+      !mintAccountInfo ||
+      !mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ) {
+      return amount;
+    }
+
+    const mintData = unpackMint(mint, mintAccountInfo, TOKEN_2022_PROGRAM_ID);
+    const scaledUiAmountConfig = getScaledUiAmountConfig(mintData);
+    if (!scaledUiAmountConfig) {
+      return amount;
+    }
+
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const multiplier =
+      now >= scaledUiAmountConfig.newMultiplierEffectiveTimestamp
+        ? scaledUiAmountConfig.newMultiplier
+        : scaledUiAmountConfig.multiplier;
+
+    const PRECISION = 10n ** 12n;
+    const scaledMultiplier = BigInt(Math.round(multiplier * Number(PRECISION)));
+    return (amount * scaledMultiplier) / PRECISION;
   }
 }

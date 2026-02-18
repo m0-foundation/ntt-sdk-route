@@ -1,6 +1,6 @@
 {
   "name": "@m0-foundation/ntt-sdk-route",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
