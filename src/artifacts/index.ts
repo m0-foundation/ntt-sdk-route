@@ -3,6 +3,8 @@ import { Portal } from "./portal";
 import PORTAL from "./portal.json";
 import { WormholeAdapter } from "./wormhole_adapter";
 import WORMHOLE_ADAPTER from "./wormhole_adapter.json";
+import { ExtSwap } from "./ext_swap";
+import EXT_SWAP from "./ext_swap.json";
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
@@ -18,4 +20,12 @@ export const svmWormholeAdapterProvider = (
   const key = Keypair.generate();
   const dummyProvider = new AnchorProvider(connection, new NodeWallet(key));
   return new Program<WormholeAdapter>(WORMHOLE_ADAPTER, dummyProvider);
+};
+
+export const svmSwapFacilityProvider = (
+  connection: Connection,
+): Program<ExtSwap> => {
+  const key = Keypair.generate();
+  const dummyProvider = new AnchorProvider(connection, new NodeWallet(key));
+  return new Program<ExtSwap>(EXT_SWAP, dummyProvider);
 };

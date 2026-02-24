@@ -128,7 +128,7 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana", "Fogo"];
+        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana"];
       case "Testnet":
         return [
           "Sepolia",
@@ -154,12 +154,6 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
       case "BaseSepolia":
         return this.EVM_CONTRACTS;
-      case "Solana":
-      case "Fogo":
-        return SolanaRoutes.getSolanaContracts(
-          chainContext.network,
-          chainContext.chain,
-        );
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -615,10 +609,8 @@ export class M0AutomaticRoute<N extends Network>
     const routeInstance = new executorRoute(this.wh);
 
     const resolveM = (chain: Chain) => {
-      if (chainToPlatform(chain) === "Solana") {
-        const c = chain as SolanaChains;
-        return SolanaRoutes.getSolanaContracts(this.wh.network, c).token;
-      }
+      if (chainToPlatform(chain) === "Solana")
+        return "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH";
       return M0AutomaticRoute.EVM_CONTRACTS.token;
     };
 
