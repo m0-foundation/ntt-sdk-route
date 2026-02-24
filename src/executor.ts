@@ -1,10 +1,10 @@
 import { chain, Chain, Network } from "@wormhole-foundation/sdk-connect";
 import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { SolanaRoutes } from "./svm";
+import { SolanaRoutes } from "./svm-old";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
 
 export function getExecutorConfig(
-  network: Network = "Mainnet"
+  network: Network = "Mainnet",
 ): NttExecutorRoute.Config {
   // core programs the same for Fogo and Solana
   const svmContracts = SolanaRoutes.getSolanaContracts(network, "Solana");

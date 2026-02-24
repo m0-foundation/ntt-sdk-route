@@ -1,2 +1,2 @@
 export * from "./m0AutomaticRoute";
-export { SolanaRoutes } from "./svm";
+export { SolanaRoutes } from "./svm-old";

@@ -50,18 +50,13 @@ import {
 import { Contract, TransactionRequest } from "ethers";
 import { Ntt, NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
-  SolanaAddress,
   SolanaChains,
   SolanaUnsignedTransaction,
 } from "@wormhole-foundation/sdk-solana";
 import {
-  AddressLookupTableAccount,
   Connection,
-  Keypair,
-  LAMPORTS_PER_SOL,
   TransactionMessage,
   VersionedTransaction,
-  Transaction,
   PublicKey,
 } from "@solana/web3.js";
 import {
@@ -69,10 +64,10 @@ import {
   TOKEN_2022_PROGRAM_ID,
   unpackMint,
 } from "@solana/spl-token";
-import { SolanaRoutes } from "./svm";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
 import { getExecutorConfig } from "./executor";
+import { SolanaRouter } from "./svm";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -350,7 +345,6 @@ export class M0AutomaticRoute<N extends Network>
             to,
             sourceToken,
             destinationToken,
-            options,
           );
 
     const txids = await signSendWait(fromChain, initXfer, signer);
@@ -486,110 +480,50 @@ export class M0AutomaticRoute<N extends Network>
     recipient: ChainAddress,
     sourceToken: string,
     destinationToken: string,
-    options: Ntt.TransferOptions,
-    outboxItem?: Keypair,
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    const router = new SolanaRoutes(ntt);
-
-    // Bridging from $M
-    if (router.getSolanaContracts().token === sourceToken) {
-      yield* ntt.transfer(sender, amount, recipient, options);
-      return;
-    }
-
-    const config = await ntt.getConfig();
-    if (config.paused) throw new Error("Contract is paused");
-
-    outboxItem = outboxItem ?? Keypair.generate();
-    const payerAddress = new SolanaAddress(sender).unwrap();
-    const sourceMint = new PublicKey(sourceToken);
+    const router = new SolanaRouter(ntt);
+    const tokenSender = new PublicKey(sender.address);
 
     // Convert principal amount to UI amount if mint has scaled-ui config
     amount = await M0AutomaticRoute.applyScaledUiMultiplier(
       ntt.connection,
-      sourceMint,
+      new PublicKey(sourceToken),
       amount,
     );
 
-    // Use custom transfer instruction for extension tokens
+    // Use custom transfer instruction (not NTT)
     const ixs = [
-      router.getTransferExtensionBurnIx(
+      await router.buildSendTokenInstruction(
         amount,
-        recipient,
-        new PublicKey(sender.toUint8Array()),
-        outboxItem.publicKey,
-        sourceMint,
-        toUniversal(recipient.chain, destinationToken).toUint8Array(),
-        options.queue,
+        tokenSender,
+        sourceToken,
+        destinationToken,
+        recipient.chain,
+        recipient.address.toString(),
       ),
     ];
 
-    // Create release ix for each transceiver
-    for (let ix = 0; ix < ntt.transceivers.length; ++ix) {
-      if (ix === 0) {
-        const whTransceiver = await ntt.getWormholeTransceiver();
-        if (!whTransceiver) {
-          throw new Error("wormhole transceiver not found");
-        }
-        const releaseIx = await whTransceiver.createReleaseWormholeOutboundIx(
-          payerAddress,
-          outboxItem.publicKey,
-          !options.queue,
-        );
-        ixs.push(releaseIx);
-      }
-    }
-
-    const tx = new Transaction();
-    tx.feePayer = payerAddress;
-    tx.add(...ixs);
-
-    if (this.requiresExecutor(recipient.chain)) {
-      const quote = await this.getExecutorQuote(
-        ntt.chain,
+    // Request relay
+    ixs.push(
+      await router.buildExecutorRelayInstruction(
+        tokenSender,
+        await this.getExecutorQuote(ntt.chain, recipient.chain, amount),
         recipient.chain,
-        amount,
-      );
+      ),
+    );
 
-      tx.add(
-        await router.getExecutorRelayIx(payerAddress, quote, recipient.chain),
-      );
-    } else if (options.automatic) {
-      if (!ntt.quoter) {
-        throw new Error(
-          "No quoter available, cannot initiate an automatic transfer.",
-        );
-      }
-
-      const fee = await ntt.quoteDeliveryPrice(recipient.chain, options);
-
-      const relayIx = await ntt.quoter.createRequestRelayInstruction(
-        payerAddress,
-        outboxItem.publicKey,
-        recipient.chain,
-        Number(fee) / LAMPORTS_PER_SOL,
-        0,
-      );
-      tx.add(relayIx);
-    }
-
-    const luts: AddressLookupTableAccount[] = [];
-    try {
-      luts.push(await ntt.getAddressLookupTable());
-      luts.push(await router.getAddressLookupTableAccounts(ntt.connection));
-    } catch {}
+    // Get address table from Wormhole resolver
+    const lut = await router.getAddressLookupTableAccounts();
 
     const messageV0 = new TransactionMessage({
-      payerKey: payerAddress,
-      instructions: tx.instructions,
+      payerKey: tokenSender,
+      instructions: ixs,
       recentBlockhash: (await ntt.connection.getLatestBlockhash()).blockhash,
-    }).compileToV0Message(luts);
-
-    const vtx = new VersionedTransaction(messageV0);
+    }).compileToV0Message([lut]);
 
     yield ntt.createUnsignedTx(
-      { transaction: vtx, signers: [outboxItem] },
-      "Ntt.Transfer",
+      { transaction: new VersionedTransaction(messageV0) },
+      "M0 Extension Bridge",
     );
   }
 
