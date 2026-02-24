@@ -1,2 +1,2 @@
 export * from "./m0AutomaticRoute";
-export { SolanaRouter } from "./svm";
+export { SvmRouter as SolanaRouter } from "./svm";

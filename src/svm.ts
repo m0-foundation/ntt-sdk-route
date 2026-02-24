@@ -1,8 +1,12 @@
 import {
   Chain,
+  ChainContext,
   chainToChainId,
+  chainToPlatform,
   Network,
   sha256,
+  TokenId,
+  UniversalAddress,
 } from "@wormhole-foundation/sdk-connect";
 import { SolanaChains } from "@wormhole-foundation/sdk-solana";
 import { SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
@@ -14,6 +18,7 @@ import {
 } from "./artifacts";
 import {
   AddressLookupTableAccount,
+  Connection,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -24,6 +29,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import BN from "bn.js";
+import { Contracts } from "./m0AutomaticRoute";
 
 type extensionToken = {
   destinations: { [chainId: number]: Set<string> };
@@ -32,11 +38,47 @@ type extensionToken = {
   mint: PublicKey;
 };
 
-export class SolanaRouter<N extends Network, C extends SolanaChains> {
-  private cachedLookupTable: AddressLookupTableAccount | null = null;
-  private tokens: Record<string, extensionToken> | null = null;
+export class SvmRouter {
+  private static instance: SvmRouter | null = null;
 
-  constructor(private ntt: SolanaNtt<N, C>) {}
+  static evmPeer = "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153";
+
+  static dummyContracts: Contracts = {
+    token: PublicKey.default.toString(),
+    manager: PublicKey.default.toString(),
+    transceiver: { wormhole: PublicKey.default.toString() },
+    mLikeTokens: [],
+  };
+
+  constructor(
+    private connection: Connection,
+    private chain: Chain,
+    private network: Network,
+    private cachedLookupTable: AddressLookupTableAccount | null = null,
+    private tokens: Record<string, extensionToken> | null = null,
+  ) {}
+
+  static fromNtt(ntt: SolanaNtt<Network, SolanaChains>) {
+    if (!SvmRouter.instance) {
+      SvmRouter.instance = new SvmRouter(
+        ntt.connection,
+        ntt.chain,
+        ntt.network,
+      );
+    }
+    return SvmRouter.instance;
+  }
+
+  static async fromChainContext(ctx: ChainContext<Network>) {
+    if (chainToPlatform(ctx.chain) === "Solana") {
+      throw new Error(`Unsupported svm chain: ${ctx.chain}`);
+    }
+    const ntt = (await ctx.getProtocol("Ntt")) as SolanaNtt<
+      Network,
+      SolanaChains
+    >;
+    return SvmRouter.fromNtt(ntt);
+  }
 
   async buildSendTokenInstruction(
     amount: bigint,
@@ -57,12 +99,12 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
       extension.extensionProgram,
     );
 
-    return svmPortalProvider(this.ntt.connection)
+    return svmPortalProvider(this.connection)
       .methods.sendToken(
         new BN(amount),
-        SolanaRouter.hexToBytes32(destinationToken),
-        getM0ChainId(destinationChain, this.ntt.network),
-        SolanaRouter.hexToBytes32(recipient),
+        SvmRouter.hexToBytes32(destinationToken),
+        getM0ChainId(destinationChain, this.network),
+        SvmRouter.hexToBytes32(recipient),
       )
       .accounts({
         sender,
@@ -81,8 +123,8 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
       return this.tokens;
     }
 
-    const portalProgram = svmPortalProvider(this.ntt.connection);
-    const swapProgram = svmSwapFacilityProvider(this.ntt.connection);
+    const portalProgram = svmPortalProvider(this.connection);
+    const swapProgram = svmSwapFacilityProvider(this.connection);
 
     // Extensions registered on the swap facility
     const swapGlobal = await swapProgram.account.swapGlobal.fetch(
@@ -112,7 +154,7 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
       for (const { sourceMint, destinationToken } of path.account.paths) {
         const dests = this.tokens[sourceMint.toBase58()].destinations;
         (dests[destinationChainId] ??= new Set()).add(
-          SolanaRouter.bytes32toHex(destinationToken),
+          SvmRouter.bytes32toHex(destinationToken),
         );
       }
     }
@@ -120,11 +162,42 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
     return this.tokens;
   }
 
+  async getSupportedSourceTokens(): Promise<TokenId[]> {
+    const extensions = await this.getSupportedExtensions();
+    const extensionsWithPath = Object.keys(extensions).filter((mint) => {
+      const dests = extensions[mint].destinations;
+      return Object.keys(dests).length > 0;
+    });
+
+    return extensionsWithPath.map((mint) => ({
+      chain: this.chain,
+      address: new UniversalAddress(mint, "base58"),
+    }));
+  }
+
+  async getSupportedDestinationTokens(
+    token: string,
+    toChain: Chain,
+  ): Promise<TokenId[]> {
+    const extensions = await this.getSupportedExtensions();
+    const extension = extensions[token];
+    if (!extension) return [];
+
+    const chainId = getM0ChainId(toChain, this.network);
+    const dests = extension.destinations[chainId];
+    if (!dests) return [];
+
+    return Array.from(dests).map((dest) => ({
+      chain: toChain,
+      address: new UniversalAddress(dest, "hex"),
+    }));
+  }
+
   async getAddressLookupTableAccounts(): Promise<AddressLookupTableAccount> {
     if (this.cachedLookupTable) return this.cachedLookupTable;
 
     // Fetch the address table from the wormhole adapter's global state
-    const program = svmWormholeAdapterProvider(this.ntt.connection);
+    const program = svmWormholeAdapterProvider(this.connection);
     const globalInfo = await program.account.wormholeGlobal.fetch(
       PublicKey.findProgramAddressSync(
         [Buffer.from("global")],
@@ -133,9 +206,7 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
     );
 
     // Fetch the address table account
-    const info = await this.ntt.connection.getAccountInfo(
-      globalInfo!.receiveLut!,
-    );
+    const info = await this.connection.getAccountInfo(globalInfo!.receiveLut!);
 
     this.cachedLookupTable = new AddressLookupTableAccount({
       key: globalInfo!.receiveLut!,
@@ -152,21 +223,23 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
   ): Promise<TransactionInstruction> {
     const emitter = PublicKey.findProgramAddressSync(
       [Buffer.from("emitter")],
-      this.ntt.program.programId,
+      svmWormholeAdapterProvider(this.connection).programId,
     )[0];
 
     const bridgeSequence = PublicKey.findProgramAddressSync(
       [Buffer.from("Sequence"), emitter.toBytes()],
-      new PublicKey(this.ntt.contracts.coreBridge!),
+      this.network === "Mainnet"
+        ? new PublicKey("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth")
+        : new PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"),
     )[0];
 
     // Fetch the current sequence for relaying
-    const info = await this.ntt.connection.getAccountInfo(bridgeSequence);
+    const info = await this.connection.getAccountInfo(bridgeSequence);
     const sequence = new BN(info!.data, "le");
 
     const vaaReqBytes = Buffer.concat([
       Buffer.from("ERV1"),
-      new BN(chainToChainId(this.ntt.chain)).toArrayLike(Buffer, "be", 2),
+      new BN(chainToChainId(this.chain)).toArrayLike(Buffer, "be", 2),
       emitter.toBuffer(),
       sequence.toArrayLike(Buffer, "be", 8),
     ]);
@@ -190,7 +263,7 @@ export class SolanaRouter<N extends Network, C extends SolanaChains> {
         Buffer.from(sha256("global:request_for_execution").subarray(0, 8)),
         new BN(quote.estimatedCost.toString()).toArrayLike(Buffer, "le", 8),
         new BN(chainToChainId(destinationChain)).toArrayLike(Buffer, "le", 2),
-        this.ntt.program.programId.toBuffer(),
+        Buffer.from(SvmRouter.hexToBytes32(SvmRouter.evmPeer)),
         sender.toBuffer(),
         lengthPrefixed(signedQuoteBytes),
         lengthPrefixed(vaaReqBytes),

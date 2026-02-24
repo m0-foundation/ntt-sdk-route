@@ -67,7 +67,7 @@ import {
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
 import { getExecutorConfig } from "./executor";
-import { SolanaRouter } from "./svm";
+import { SvmRouter } from "./svm";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -79,7 +79,7 @@ type Q = routes.Quote<Op, Vp>;
 
 type R = NttRoute.AutomaticTransferReceipt;
 
-type Contracts = Ntt.Contracts & { mLikeTokens: string[] };
+export type Contracts = Ntt.Contracts & { mLikeTokens: string[] };
 
 export class M0AutomaticRoute<N extends Network>
   extends routes.AutomaticRoute<N, Op, Vp, R>
@@ -136,7 +136,6 @@ export class M0AutomaticRoute<N extends Network>
           "OptimismSepolia",
           "BaseSepolia",
           "Solana",
-          "Fogo",
         ];
       default:
         throw new Error(`Unsupported network: ${network}`);
@@ -154,6 +153,8 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
       case "BaseSepolia":
         return this.EVM_CONTRACTS;
+      case "Solana":
+        return SvmRouter.dummyContracts;
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -162,6 +163,11 @@ export class M0AutomaticRoute<N extends Network>
   static async supportedSourceTokens(
     fromChain: ChainContext<Network>,
   ): Promise<TokenId[]> {
+    if (chainToPlatform(fromChain.chain) === "Solana") {
+      const router = await SvmRouter.fromChainContext(fromChain);
+      return await router.getSupportedSourceTokens();
+    }
+
     const { token, mLikeTokens } = this.getContracts(fromChain);
     return [
       Wormhole.tokenId(fromChain.chain, token),
@@ -174,6 +180,14 @@ export class M0AutomaticRoute<N extends Network>
     fromChain: ChainContext<N>,
     toChain: ChainContext<N>,
   ): Promise<TokenId[]> {
+    if (chainToPlatform(fromChain.chain) === "Solana") {
+      const router = await SvmRouter.fromChainContext(fromChain);
+      return await router.getSupportedDestinationTokens(
+        token.address.toString(),
+        toChain.chain,
+      );
+    }
+
     const sourceTokens = await this.supportedSourceTokens(fromChain);
     if (!sourceTokens.some((t) => isSameToken(t, token))) {
       return [];
@@ -181,11 +195,6 @@ export class M0AutomaticRoute<N extends Network>
 
     const { token: mToken, mLikeTokens } = this.getContracts(toChain);
     const tokens = mLikeTokens.map((x) => Wormhole.tokenId(toChain.chain, x));
-
-    // SVM chains cannot receive $M directly
-    if (toChain.chain === "Solana" || toChain.chain === "Fogo") {
-      return tokens;
-    }
 
     return [...tokens, Wormhole.tokenId(toChain.chain, mToken)];
   }
@@ -475,7 +484,7 @@ export class M0AutomaticRoute<N extends Network>
     sourceToken: string,
     destinationToken: string,
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    const router = new SolanaRouter(ntt);
+    const router = SvmRouter.fromNtt(ntt);
     const tokenSender = new PublicKey(sender.address);
 
     // Convert principal amount to UI amount if mint has scaled-ui config
