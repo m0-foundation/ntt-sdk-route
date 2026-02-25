@@ -15,10 +15,12 @@ import {
   svmWormholeAdapterProvider,
 } from "./artifacts";
 import {
+  AccountMeta,
   AddressLookupTableAccount,
   Connection,
   PublicKey,
   SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
   TransactionInstruction,
 } from "@solana/web3.js";
 import { getM0ChainId } from "./chainIds";
@@ -42,7 +44,7 @@ export class SvmRouter {
   constructor(
     public connection: Connection,
     public chain: Chain,
-    public network: Network,
+    public network: Exclude<Network, "Devnet">,
     private cachedLookupTable: AddressLookupTableAccount | null = null,
     private tokens: Record<string, extensionToken> | null = null,
   ) {}
@@ -56,7 +58,7 @@ export class SvmRouter {
       SvmRouter.instance = new SvmRouter(
         await ctx.getRpc(),
         ctx.chain,
-        ctx.network,
+        ctx.network as Exclude<Network, "Devnet">,
       );
     }
 
@@ -79,7 +81,7 @@ export class SvmRouter {
       extension.mint,
       sender,
       true,
-      extension.extensionProgram,
+      extension.tokenProgram,
     );
 
     return svmPortalProvider(this.connection)
@@ -98,6 +100,7 @@ export class SvmRouter {
         mTokenProgram: TOKEN_2022_PROGRAM_ID,
         extensionTokenProgram: extension.tokenProgram,
       })
+      .remainingAccounts(this.getRemainingAccounts())
       .instruction();
   }
 
@@ -253,6 +256,61 @@ export class SvmRouter {
         lengthPrefixed(relayInstructions),
       ]),
     });
+  }
+
+  private getRemainingAccounts(): AccountMeta[] {
+    const adapter = svmWormholeAdapterProvider(null as any).programId;
+
+    // Wormhole network-specific accounts
+    const bridgePrograms = {
+      Mainnet: {
+        config: new PublicKey("2yVjuQwpsvdsrywzsJJVs9Ueh4zayyo5DYJbBNc3DDpn"),
+        core: new PublicKey("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth"),
+        fee: new PublicKey("9bFNrXNb2WTx8fMHXCheaZqkLZ3YCCaiqTftHxeintHy"),
+        shim: new PublicKey("EtZMZM22ViKMo4r5y4Anovs3wKQ2owUmDpjygnMMcdEX"),
+      },
+      Testnet: {
+        config: new PublicKey("6bi4JGDoRwUs9TYBuvoA7dUVyikTJDrJsJU1ew6KVLiu"),
+        core: new PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"),
+        fee: new PublicKey("7s3a1ycs16d6SNDumaRtjcoyMaTDZPavzgsmS3uUZYWX"),
+        shim: new PublicKey("EtZMZM22ViKMo4r5y4Anovs3wKQ2owUmDpjygnMMcdEX"),
+      },
+    }[this.network];
+
+    // PDAs
+    const [wormholeGlobal] = PublicKey.findProgramAddressSync(
+      [Buffer.from("global")],
+      adapter,
+    );
+    const [shimEa] = PublicKey.findProgramAddressSync(
+      [Buffer.from("__event_authority")],
+      bridgePrograms.shim,
+    );
+    const [emitter] = PublicKey.findProgramAddressSync(
+      [Buffer.from("emitter")],
+      adapter,
+    );
+    const [sequence] = PublicKey.findProgramAddressSync(
+      [Buffer.from("Sequence"), emitter.toBytes()],
+      bridgePrograms.core,
+    );
+    const [message] = PublicKey.findProgramAddressSync(
+      [emitter.toBytes()],
+      bridgePrograms.shim,
+    );
+
+    return [
+      { pubkey: wormholeGlobal, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.config, isSigner: false, isWritable: true },
+      { pubkey: message, isSigner: false, isWritable: true },
+      { pubkey: emitter, isSigner: false, isWritable: false },
+      { pubkey: sequence, isSigner: false, isWritable: true },
+      { pubkey: bridgePrograms.fee, isSigner: false, isWritable: true },
+      { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.core, isSigner: false, isWritable: false },
+      { pubkey: shimEa, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.shim, isSigner: false, isWritable: false },
+    ];
   }
 
   static hexToBytes32(hex: string): number[] {

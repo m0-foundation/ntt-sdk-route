@@ -111,6 +111,8 @@ async function getSigner<N extends Network, C extends Chain>(
       throw new Error("Unrecognized platform: " + platform);
   }
 
+  console.debug(`Using signer ${signer.address()} on chain ${chain.chain}`);
+
   return {
     signer: signer as Signer<N, C>,
     address: Wormhole.chainAddress(chain.chain, signer.address()),
