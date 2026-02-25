@@ -153,8 +153,6 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
       case "BaseSepolia":
         return this.EVM_CONTRACTS;
-      case "Solana":
-        return SvmRouter.dummyContracts;
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -181,7 +179,7 @@ export class M0AutomaticRoute<N extends Network>
     toChain: ChainContext<N>,
   ): Promise<TokenId[]> {
     if (chainToPlatform(fromChain.chain) === "Solana") {
-      const router = await SvmRouter.fromChainContext(fromChain);
+      const router = await SvmRouter.fromChainContext(await fromChain.getRpc()); // FROM RPC
       return await router.getSupportedDestinationTokens(
         token.address.toString(),
         toChain.chain,
@@ -210,6 +208,10 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
+    if (request.fromChain.chain === "Solana") {
+      return true;
+    }
+
     const ntt = await request.fromChain.getProtocol("Ntt", {
       ntt: M0AutomaticRoute.getContracts(request.fromChain),
     });
@@ -341,7 +343,7 @@ export class M0AutomaticRoute<N extends Network>
           )
         : // for Solana use custom transfer instruction
           this.transferSolanaExtension(
-            ntt as SolanaNtt<N, SolanaChains>,
+            fromChain,
             // @ts-ignore
             sender,
             transferAmount,
@@ -477,19 +479,19 @@ export class M0AutomaticRoute<N extends Network>
   }
 
   async *transferSolanaExtension<N extends Network, C extends SolanaChains>(
-    ntt: SolanaNtt<N, C>,
+    ctx: ChainContext<Network>,
     sender: AccountAddress<C>,
     amount: bigint,
     recipient: ChainAddress,
     sourceToken: string,
     destinationToken: string,
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    const router = SvmRouter.fromNtt(ntt);
+    const router = await SvmRouter.fromChainContext(ctx);
     const tokenSender = new PublicKey(sender.address);
 
     // Convert principal amount to UI amount if mint has scaled-ui config
     amount = await M0AutomaticRoute.applyScaledUiMultiplier(
-      ntt.connection,
+      router.connection,
       new PublicKey(sourceToken),
       amount,
     );
@@ -510,7 +512,7 @@ export class M0AutomaticRoute<N extends Network>
     ixs.push(
       await router.buildExecutorRelayInstruction(
         tokenSender,
-        await this.getExecutorQuote(ntt.chain, recipient.chain, amount),
+        await this.getExecutorQuote(ctx.chain, recipient.chain, amount),
         recipient.chain,
       ),
     );
@@ -521,12 +523,15 @@ export class M0AutomaticRoute<N extends Network>
     const messageV0 = new TransactionMessage({
       payerKey: tokenSender,
       instructions: ixs,
-      recentBlockhash: (await ntt.connection.getLatestBlockhash()).blockhash,
+      recentBlockhash: (await router.connection.getLatestBlockhash()).blockhash,
     }).compileToV0Message([lut]);
 
-    yield ntt.createUnsignedTx(
+    yield new SolanaUnsignedTransaction<N, C>(
       { transaction: new VersionedTransaction(messageV0) },
+      ctx.network as N,
+      ctx.chain as C,
       "M0 Extension Bridge",
+      false,
     );
   }
 

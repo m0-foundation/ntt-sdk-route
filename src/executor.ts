@@ -1,14 +1,11 @@
-import { chain, Chain, Network } from "@wormhole-foundation/sdk-connect";
+import { Chain, Network } from "@wormhole-foundation/sdk-connect";
 import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { SolanaRoutes } from "./svm-old";
 import { M0AutomaticRoute } from "./m0AutomaticRoute";
+import { PublicKey } from "@solana/web3.js";
 
 export function getExecutorConfig(
   network: Network = "Mainnet",
 ): NttExecutorRoute.Config {
-  // core programs the same for Fogo and Solana
-  const svmContracts = SolanaRoutes.getSolanaContracts(network, "Solana");
-
   const svmChains: Chain[] = ["Solana", "Fogo"];
   const evmChains: Chain[] =
     network === "Mainnet"
@@ -21,15 +18,15 @@ export function getExecutorConfig(
         M0: [
           ...svmChains.map((chain) => ({
             chain,
-            token: svmContracts.token,
-            manager: svmContracts.manager,
+            token: PublicKey.default.toBase58(),
+            manager: PublicKey.default.toBase58(),
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
-                address: svmContracts.transceiver.wormhole,
+                address: PublicKey.default.toBase58(),
               },
             ],
-            quoter: svmContracts.quoter,
+            quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ",
           })),
           ...evmChains.map((chain) => ({
             chain,
@@ -52,12 +49,7 @@ export function getExecutorConfig(
         // SVM chains require extra compute when receiving messages
         // so we need to override the gas cost
         Solana: {
-          [svmContracts.token]: {
-            msgValue: 15_000_000n,
-          },
-        },
-        Fogo: {
-          [svmContracts.token]: {
+          [PublicKey.default.toBase58()]: {
             msgValue: 15_000_000n,
           },
         },

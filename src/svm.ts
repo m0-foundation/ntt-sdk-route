@@ -40,44 +40,30 @@ type extensionToken = {
 
 export class SvmRouter {
   private static instance: SvmRouter | null = null;
-
   static evmPeer = "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153";
 
-  static dummyContracts: Contracts = {
-    token: PublicKey.default.toString(),
-    manager: PublicKey.default.toString(),
-    transceiver: { wormhole: PublicKey.default.toString() },
-    mLikeTokens: [],
-  };
-
   constructor(
-    private connection: Connection,
-    private chain: Chain,
-    private network: Network,
+    public connection: Connection,
+    public chain: Chain,
+    public network: Network,
     private cachedLookupTable: AddressLookupTableAccount | null = null,
     private tokens: Record<string, extensionToken> | null = null,
   ) {}
 
-  static fromNtt(ntt: SolanaNtt<Network, SolanaChains>) {
-    if (!SvmRouter.instance) {
-      SvmRouter.instance = new SvmRouter(
-        ntt.connection,
-        ntt.chain,
-        ntt.network,
-      );
-    }
-    return SvmRouter.instance;
-  }
-
   static async fromChainContext(ctx: ChainContext<Network>) {
-    if (chainToPlatform(ctx.chain) === "Solana") {
+    if (chainToPlatform(ctx.chain) !== "Solana") {
       throw new Error(`Unsupported svm chain: ${ctx.chain}`);
     }
-    const ntt = (await ctx.getProtocol("Ntt")) as SolanaNtt<
-      Network,
-      SolanaChains
-    >;
-    return SvmRouter.fromNtt(ntt);
+
+    if (!SvmRouter.instance) {
+      SvmRouter.instance = new SvmRouter(
+        await ctx.getRpc(),
+        ctx.chain,
+        ctx.network,
+      );
+    }
+
+    return SvmRouter.instance;
   }
 
   async buildSendTokenInstruction(
@@ -158,6 +144,8 @@ export class SvmRouter {
         );
       }
     }
+
+    console.log("TOKENS", JSON.stringify(this.tokens, null, 2));
 
     return this.tokens;
   }
