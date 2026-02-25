@@ -153,6 +153,14 @@ export class M0AutomaticRoute<N extends Network>
       case "ArbitrumSepolia":
       case "BaseSepolia":
         return this.EVM_CONTRACTS;
+      case "Solana":
+        return {
+          token: "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH",
+          transceiver: {},
+          manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
+          mLikeTokens: [],
+          quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ",
+        };
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -179,7 +187,7 @@ export class M0AutomaticRoute<N extends Network>
     toChain: ChainContext<N>,
   ): Promise<TokenId[]> {
     if (chainToPlatform(fromChain.chain) === "Solana") {
-      const router = await SvmRouter.fromChainContext(await fromChain.getRpc()); // FROM RPC
+      const router = await SvmRouter.fromChainContext(fromChain);
       return await router.getSupportedDestinationTokens(
         token.address.toString(),
         toChain.chain,
@@ -232,15 +240,20 @@ export class M0AutomaticRoute<N extends Network>
       request.destination.decimals,
     );
 
-    const fromContracts = M0AutomaticRoute.getContracts(request.fromChain);
-    const toContracts = M0AutomaticRoute.getContracts(request.toChain);
-
     const validatedParams: Vp = {
       amount: params.amount,
       normalizedParams: {
         amount: trimmedAmount,
-        sourceContracts: fromContracts,
-        destinationContracts: toContracts,
+        sourceContracts: {
+          token: "",
+          manager: "",
+          transceiver: {},
+        },
+        destinationContracts: {
+          token: "",
+          manager: "",
+          transceiver: {},
+        },
         options: {
           queue: false,
           automatic: true,
@@ -259,13 +272,6 @@ export class M0AutomaticRoute<N extends Network>
     const ntt = await fromChain.getProtocol("Ntt", {
       ntt: M0AutomaticRoute.getContracts(fromChain),
     });
-
-    if (!(await ntt.isRelayingAvailable(toChain.chain))) {
-      return {
-        success: false,
-        error: new Error(`Relaying to chain ${toChain.chain} is not available`),
-      };
-    }
 
     const deliveryPrice = await ntt.quoteDeliveryPrice(
       toChain.chain,

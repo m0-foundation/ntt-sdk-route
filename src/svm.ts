@@ -8,8 +8,6 @@ import {
   TokenId,
   UniversalAddress,
 } from "@wormhole-foundation/sdk-connect";
-import { SolanaChains } from "@wormhole-foundation/sdk-solana";
-import { SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
   svmPortalProvider,
@@ -29,7 +27,6 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import BN from "bn.js";
-import { Contracts } from "./m0AutomaticRoute";
 
 type extensionToken = {
   destinations: { [chainId: number]: Set<string> };
@@ -94,7 +91,7 @@ export class SvmRouter {
       )
       .accounts({
         sender,
-        bridgeAdapter: "", // TODO: finalize wormhole adapter chain id (and update IDL)
+        bridgeAdapter: svmWormholeAdapterProvider(this.connection).programId,
         extensionMint: sourceToken,
         extensionTokenAccount,
         extensionProgram: extension.extensionProgram,
@@ -144,8 +141,6 @@ export class SvmRouter {
         );
       }
     }
-
-    console.log("TOKENS", JSON.stringify(this.tokens, null, 2));
 
     return this.tokens;
   }

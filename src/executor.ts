@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 export function getExecutorConfig(
   network: Network = "Mainnet",
 ): NttExecutorRoute.Config {
-  const svmChains: Chain[] = ["Solana", "Fogo"];
+  const svmChains: Chain[] = ["Solana"];
   const evmChains: Chain[] =
     network === "Mainnet"
       ? ["Ethereum", "Optimism", "Arbitrum", "Base"]
@@ -18,8 +18,8 @@ export function getExecutorConfig(
         M0: [
           ...svmChains.map((chain) => ({
             chain,
-            token: PublicKey.default.toBase58(),
-            manager: PublicKey.default.toBase58(),
+            token: "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH",
+            manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
