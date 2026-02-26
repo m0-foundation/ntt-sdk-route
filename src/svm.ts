@@ -26,7 +26,9 @@ import {
 import { getM0ChainId } from "./chainIds";
 import {
   getAssociatedTokenAddressSync,
+  getScaledUiAmountConfig,
   TOKEN_2022_PROGRAM_ID,
+  unpackMint,
 } from "@solana/spl-token";
 import BN from "bn.js";
 
@@ -162,11 +164,11 @@ export class SvmRouter {
   }
 
   async getSupportedDestinationTokens(
-    token: string,
+    sourceToken: string,
     toChain: Chain,
   ): Promise<TokenId[]> {
     const extensions = await this.getSupportedExtensions();
-    const extension = extensions[token];
+    const extension = extensions[sourceToken];
     if (!extension) return [];
 
     const chainId = getM0ChainId(toChain, this.network);
@@ -311,6 +313,36 @@ export class SvmRouter {
       { pubkey: shimEa, isSigner: false, isWritable: false },
       { pubkey: bridgePrograms.shim, isSigner: false, isWritable: false },
     ];
+  }
+
+  static async applyScaledUiMultiplier(
+    connection: Connection,
+    mint: PublicKey,
+    amount: bigint,
+  ): Promise<bigint> {
+    const mintAccountInfo = await connection.getAccountInfo(mint);
+    if (
+      !mintAccountInfo ||
+      !mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ) {
+      return amount;
+    }
+
+    const mintData = unpackMint(mint, mintAccountInfo, TOKEN_2022_PROGRAM_ID);
+    const scaledUiAmountConfig = getScaledUiAmountConfig(mintData);
+    if (!scaledUiAmountConfig) {
+      return amount;
+    }
+
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const multiplier =
+      now >= scaledUiAmountConfig.newMultiplierEffectiveTimestamp
+        ? scaledUiAmountConfig.newMultiplier
+        : scaledUiAmountConfig.multiplier;
+
+    const PRECISION = 10n ** 12n;
+    const scaledMultiplier = BigInt(Math.round(multiplier * Number(PRECISION)));
+    return (amount * scaledMultiplier) / PRECISION;
   }
 
   static hexToBytes32(hex: string): number[] {

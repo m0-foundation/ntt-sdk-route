@@ -1,6 +1,5 @@
 import { Chain, Network } from "@wormhole-foundation/sdk-connect";
 import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { M0AutomaticRoute } from "./m0AutomaticRoute";
 import { PublicKey } from "@solana/web3.js";
 
 export function getExecutorConfig(
@@ -30,15 +29,14 @@ export function getExecutorConfig(
           })),
           ...evmChains.map((chain) => ({
             chain,
-            token: M0AutomaticRoute.EVM_CONTRACTS.token,
-            manager: M0AutomaticRoute.EVM_CONTRACTS.manager,
+            token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
+            manager: "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153",
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
-                address: M0AutomaticRoute.EVM_CONTRACTS.transceiver.wormhole,
+                address: "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153",
               },
             ],
-            quoter: M0AutomaticRoute.EVM_CONTRACTS.quoter,
           })),
         ],
       },

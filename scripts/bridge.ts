@@ -24,8 +24,8 @@ const wM = {
 };
 
 (async () => {
-  const sourceChain = "Solana";
-  const destinationChain = "Sepolia";
+  const sourceChain = "Sepolia";
+  const destinationChain = "Solana";
 
   await bridge({
     network: "Testnet",
@@ -33,7 +33,7 @@ const wM = {
     sourceToken: wM[sourceChain],
     destinationChain,
     destinationToken: wM[destinationChain],
-    amount: "0.1",
+    amount: "0.01",
   });
 })();
 
