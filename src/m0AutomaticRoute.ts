@@ -241,7 +241,7 @@ export class M0AutomaticRoute<N extends Network>
       relayFee: {
         token: Wormhole.tokenId(fromChain.chain, "native"),
         amount: amount.fromBaseUnits(
-          500_000n, // Rough estimation
+          1_500_000n, // Rough estimation
           fromChain.config.nativeTokenDecimals,
         ),
       },

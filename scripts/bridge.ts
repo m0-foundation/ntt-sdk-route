@@ -21,11 +21,12 @@ import { M0AutomaticRoute } from "../src/m0AutomaticRoute";
 const wM = {
   Solana: "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp",
   Sepolia: "0x437cc33344a0B27A429f795ff6B469C72698B291",
+  BaseSepolia: "0x437cc33344a0B27A429f795ff6B469C72698B291",
 };
 
 (async () => {
-  const sourceChain = "Sepolia";
-  const destinationChain = "Solana";
+  const sourceChain = "Solana";
+  const destinationChain = "BaseSepolia";
 
   await bridge({
     network: "Testnet",

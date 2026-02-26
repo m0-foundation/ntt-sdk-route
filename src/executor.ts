@@ -44,10 +44,8 @@ export function getExecutorConfig(
     referrerFee: {
       feeDbps: 0n,
       perTokenOverrides: {
-        // SVM chains require extra compute when receiving messages
-        // so we need to override the gas cost
         Solana: {
-          [PublicKey.default.toBase58()]: {
+          ["mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"]: {
             msgValue: 15_000_000n,
           },
         },
