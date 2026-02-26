@@ -18,27 +18,21 @@ import {
   finality,
   isAttested,
   isRedeemed,
-  isSameToken,
   isSourceFinalized,
   isSourceInitiated,
   routes,
   signSendWait,
   toChainId,
-  toUniversal,
-  universalAddress,
 } from "@wormhole-foundation/sdk-connect";
 import { register as registerNttDefinitions } from "@wormhole-foundation/sdk-definitions-ntt";
 import { register as registerEvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
 import { register as registerSolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 import { EvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
-import { SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
 
 import {
   addChainId,
-  addFrom,
   EvmAddress,
   EvmChains,
-  EvmPlatform,
   EvmUnsignedTransaction,
 } from "@wormhole-foundation/sdk-evm";
 import "@wormhole-foundation/sdk-solana";
@@ -47,32 +41,20 @@ import {
   NttExecutorRoute,
   NttRoute,
 } from "@wormhole-foundation/sdk-route-ntt";
-import { Contract, TransactionRequest } from "ethers";
 import { Ntt, NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
-  SolanaAddress,
   SolanaChains,
   SolanaUnsignedTransaction,
 } from "@wormhole-foundation/sdk-solana";
 import {
-  AddressLookupTableAccount,
-  Connection,
-  Keypair,
-  LAMPORTS_PER_SOL,
   TransactionMessage,
   VersionedTransaction,
-  Transaction,
   PublicKey,
 } from "@solana/web3.js";
-import {
-  getScaledUiAmountConfig,
-  TOKEN_2022_PROGRAM_ID,
-  unpackMint,
-} from "@solana/spl-token";
-import { SolanaRoutes } from "./svm";
-import evm from "@wormhole-foundation/sdk/platforms/evm";
-import solana from "@wormhole-foundation/sdk/platforms/solana";
 import { getExecutorConfig } from "./executor";
+import { SvmRouter } from "./svm";
+import { EvmRouter } from "./evm";
+import { getM0ChainId } from "./chainIds";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -83,8 +65,6 @@ type QR = routes.QuoteResult<Op, Vp>;
 type Q = routes.Quote<Op, Vp>;
 
 type R = NttRoute.AutomaticTransferReceipt;
-
-type Contracts = Ntt.Contracts & { mLikeTokens: string[] };
 
 export class M0AutomaticRoute<N extends Network>
   extends routes.AutomaticRoute<N, Op, Vp, R>
@@ -97,29 +77,8 @@ export class M0AutomaticRoute<N extends Network>
     registerSolanaNtt();
   }
 
-  // ntt does not support gas drop-off currently
   static NATIVE_GAS_DROPOFF_SUPPORTED: boolean = false;
-
-  // USDZ token address is the same across Ethereum and Arbitrum
-  static EVM_USDZ_TOKEN = "0xA4B6DF229AEe22b4252dc578FEB2720E8A2C4A56";
-
-  // Wrapped M token address is the same on EVM chains
-  static EVM_WRAPPED_M_TOKEN = "0x437cc33344a0B27A429f795ff6B469C72698B291";
-
   static EXECUTOR_ENTRYPOINT = "0x22f04a6cd935bfa3b4d000a4e3d4079adb148198";
-
-  // Contract addresses are the same on all EVM chains
-  static EVM_CONTRACTS: Contracts = {
-    // M token address is the same on EVM chains
-    token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
-    // Wrapped $M and Extension Tokens that can bridged by unwrapping to $M
-    mLikeTokens: [this.EVM_WRAPPED_M_TOKEN, this.EVM_USDZ_TOKEN],
-    // M0 Portal address is the same on EVM chains
-    manager: "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd",
-    // Wormhole transceiver address is the same on EVM chains
-    transceiver: { wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841" },
-  };
-
   static meta = { name: "M0AutomaticRoute", provider: "M0" };
 
   static supportedNetworks(): Network[] {
@@ -133,7 +92,7 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana", "Fogo"];
+        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana"];
       case "Testnet":
         return [
           "Sepolia",
@@ -141,14 +100,13 @@ export class M0AutomaticRoute<N extends Network>
           "OptimismSepolia",
           "BaseSepolia",
           "Solana",
-          "Fogo",
         ];
       default:
         throw new Error(`Unsupported network: ${network}`);
     }
   }
 
-  static getContracts(chainContext: ChainContext<Network>): Contracts {
+  static getContracts(chainContext: ChainContext<Network>): Ntt.Contracts {
     switch (chainContext.chain) {
       case "Ethereum":
       case "Optimism":
@@ -158,13 +116,20 @@ export class M0AutomaticRoute<N extends Network>
       case "OptimismSepolia":
       case "ArbitrumSepolia":
       case "BaseSepolia":
-        return this.EVM_CONTRACTS;
+        return {
+          token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
+          manager: "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd",
+          transceiver: {
+            wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841",
+          },
+        };
       case "Solana":
-      case "Fogo":
-        return SolanaRoutes.getSolanaContracts(
-          chainContext.network,
-          chainContext.chain,
-        );
+        return {
+          token: "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH",
+          transceiver: {},
+          manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
+          quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ",
+        };
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
@@ -173,11 +138,14 @@ export class M0AutomaticRoute<N extends Network>
   static async supportedSourceTokens(
     fromChain: ChainContext<Network>,
   ): Promise<TokenId[]> {
-    const { token, mLikeTokens } = this.getContracts(fromChain);
-    return [
-      Wormhole.tokenId(fromChain.chain, token),
-      ...mLikeTokens.map((x) => Wormhole.tokenId(fromChain.chain, x)),
-    ];
+    if (chainToPlatform(fromChain.chain) === "Solana") {
+      const router = await SvmRouter.fromChainContext(fromChain);
+      return await router.getSupportedSourceTokens();
+    }
+    {
+      const router = await EvmRouter.fromChainContext(fromChain);
+      return router.getSupportedSourceTokens();
+    }
   }
 
   static async supportedDestinationTokens<N extends Network>(
@@ -185,38 +153,35 @@ export class M0AutomaticRoute<N extends Network>
     fromChain: ChainContext<N>,
     toChain: ChainContext<N>,
   ): Promise<TokenId[]> {
-    const sourceTokens = await this.supportedSourceTokens(fromChain);
-    if (!sourceTokens.some((t) => isSameToken(t, token))) {
-      return [];
+    if (chainToPlatform(fromChain.chain) === "Solana") {
+      const router = await SvmRouter.fromChainContext(fromChain);
+      return await router.getSupportedDestinationTokens(
+        token.address.toString(),
+        toChain.chain,
+      );
+    } else {
+      const router = await EvmRouter.fromChainContext(fromChain);
+      return await router.getSupportedDestinationTokens(
+        token.address.toString(),
+        toChain.chain,
+      );
     }
-
-    const { token: mToken, mLikeTokens } = this.getContracts(toChain);
-    const tokens = mLikeTokens.map((x) => Wormhole.tokenId(toChain.chain, x));
-
-    // SVM chains cannot receive $M directly
-    if (toChain.chain === "Solana" || toChain.chain === "Fogo") {
-      return tokens;
-    }
-
-    return [...tokens, Wormhole.tokenId(toChain.chain, mToken)];
   }
 
   static isProtocolSupported<N extends Network>(
     chain: ChainContext<N>,
   ): boolean {
-    return chain.supportsProtocol("Ntt");
+    return M0AutomaticRoute.supportedChains(chain.network).includes(
+      chain.chain,
+    );
   }
 
   getDefaultOptions(): Op {
     return NttRoute.AutomaticOptions;
   }
 
-  async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
-    const ntt = await request.fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(request.fromChain),
-    });
-
-    return ntt.isRelayingAvailable(request.toChain.chain);
+  async isAvailable(_: routes.RouteTransferRequest<N>): Promise<boolean> {
+    return true;
   }
 
   async validate(
@@ -256,21 +221,6 @@ export class M0AutomaticRoute<N extends Network>
     params: Vp,
   ): Promise<QR> {
     const { fromChain, toChain } = request;
-    const ntt = await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain),
-    });
-
-    if (!(await ntt.isRelayingAvailable(toChain.chain))) {
-      return {
-        success: false,
-        error: new Error(`Relaying to chain ${toChain.chain} is not available`),
-      };
-    }
-
-    const deliveryPrice = await ntt.quoteDeliveryPrice(
-      toChain.chain,
-      params.normalizedParams.options,
-    );
 
     const dstAmount = amount.scale(
       params.normalizedParams.amount,
@@ -291,7 +241,7 @@ export class M0AutomaticRoute<N extends Network>
       relayFee: {
         token: Wormhole.tokenId(fromChain.chain, "native"),
         amount: amount.fromBaseUnits(
-          deliveryPrice,
+          1_500_000n, // Rough estimation
           fromChain.config.nativeTokenDecimals,
         ),
       },
@@ -321,10 +271,6 @@ export class M0AutomaticRoute<N extends Network>
     if (!M0AutomaticRoute.isPlatformSupported(platform))
       throw new Error(`Unsupported platform ${platform}`);
 
-    const ntt = await fromChain.getProtocol("Ntt", {
-      ntt: M0AutomaticRoute.getContracts(fromChain),
-    });
-
     const sourceToken = canonicalAddress(request.source.id);
     const destinationToken = canonicalAddress(request.destination.id);
 
@@ -332,7 +278,7 @@ export class M0AutomaticRoute<N extends Network>
       platform === "Evm"
         ? // for EVM call transferMLike function
           this.transferMLike(
-            ntt as EvmNtt<N, EvmChains>,
+            fromChain,
             // @ts-ignore
             sender,
             transferAmount,
@@ -343,14 +289,13 @@ export class M0AutomaticRoute<N extends Network>
           )
         : // for Solana use custom transfer instruction
           this.transferSolanaExtension(
-            ntt as SolanaNtt<N, SolanaChains>,
+            fromChain,
             // @ts-ignore
             sender,
             transferAmount,
             to,
             sourceToken,
             destinationToken,
-            options,
           );
 
     const txids = await signSendWait(fromChain, initXfer, signer);
@@ -369,7 +314,7 @@ export class M0AutomaticRoute<N extends Network>
    * https://github.com/wormhole-foundation/native-token-transfers/blob/main/evm/ts/src/ntt.ts#L461
    */
   async *transferMLike<N extends Network, C extends EvmChains>(
-    ntt: EvmNtt<N, C>,
+    ctx: ChainContext<Network>,
     sender: AccountAddress<C>,
     amount: bigint,
     destination: ChainAddress,
@@ -378,219 +323,110 @@ export class M0AutomaticRoute<N extends Network>
     options: Ntt.TransferOptions,
   ): AsyncGenerator<EvmUnsignedTransaction<N, C>> {
     const senderAddress = new EvmAddress(sender).toString();
+    const chainId = BigInt(getM0ChainId(ctx.chain, ctx.network));
 
-    //TODO check for ERC-2612 (permit) support on token?
-    const tokenContract = EvmPlatform.getTokenImplementation(
-      ntt.provider,
+    const router = await EvmRouter.fromChainContext(ctx);
+
+    const approval = await router.getSpendApproval(
+      amount,
+      senderAddress,
       sourceToken,
     );
-
-    const spenderAddress = this.requiresExecutor(destination.chain)
-      ? M0AutomaticRoute.EXECUTOR_ENTRYPOINT
-      : ntt.managerAddress;
-
-    const allowance = await tokenContract.allowance(
-      senderAddress,
-      spenderAddress,
-    );
-
-    if (allowance < amount) {
-      const txReq = await tokenContract.approve.populateTransaction(
-        spenderAddress,
-        amount,
-      );
-      yield this.createUnsignedTx(
-        ntt,
-        addFrom(txReq, senderAddress),
-        "Ntt.Approve",
+    if (approval) {
+      yield new EvmUnsignedTransaction<N, C>(
+        addChainId(approval, chainId),
+        ctx.network as N,
+        ctx.chain as C,
+        "M0 Extension spend approval",
+        false,
       );
     }
-
-    const receiver = universalAddress(destination);
 
     // Request relay through executor
-    if (this.requiresExecutor(destination.chain)) {
-      const quote = await this.getExecutorQuote(
-        ntt.chain,
-        destination.chain,
-        amount,
-      );
-
-      const contract = new Contract(M0AutomaticRoute.EXECUTOR_ENTRYPOINT, [
-        "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress, (uint256 value, address refundAddress, bytes signedQuote, bytes instructions) executorArgs, bytes memory transceiverInstructions) external payable returns (bytes32 messageId)",
-      ]);
-
-      const executorArgs = {
-        value: quote.estimatedCost,
-        refundAddress: senderAddress,
-        signedQuote: quote.signedQuote,
-        instructions: quote.relayInstructions,
-      };
-
-      const txReq = await contract
-        .getFunction("transferMLikeToken")
-        .populateTransaction(
-          amount,
-          sourceToken,
-          toChainId(destination.chain),
-          toUniversal(destination.chain, destinationToken).toString(),
-          receiver,
-          receiver,
-          executorArgs,
-          Uint8Array.from(Buffer.from("01000101", "hex")),
-          { value: quote.estimatedCost },
-        );
-
-      yield ntt.createUnsignedTx(addFrom(txReq, senderAddress), "Ntt.transfer");
-      return;
-    }
-
-    const contract = new Contract(ntt.managerAddress, [
-      "function transferMLikeToken(uint256 amount, address sourceToken, uint16 destinationChainId, bytes32 destinationToken, bytes32 recipient, bytes32 refundAddress, bytes memory transceiverInstructions) external payable returns (uint64 sequence)",
-    ]);
-    const txReq = await contract
-      .getFunction("transferMLikeToken")
-      .populateTransaction(
-        amount,
-        sourceToken,
-        toChainId(destination.chain),
-        toUniversal(destination.chain, destinationToken).toString(),
-        receiver,
-        receiver,
-        Uint8Array.from(Buffer.from("00", "hex")),
-        { value: await ntt.quoteDeliveryPrice(destination.chain, options) },
-      );
-
-    yield ntt.createUnsignedTx(addFrom(txReq, senderAddress), "Ntt.transfer");
-  }
-
-  createUnsignedTx<N extends Network, C extends EvmChains>(
-    ntt: EvmNtt<N, C>,
-    txReq: TransactionRequest,
-    description: string,
-    parallelizable: boolean = false,
-  ): EvmUnsignedTransaction<N, C> {
-    return new EvmUnsignedTransaction(
-      addChainId(txReq, ntt.chainId),
-      ntt.network,
-      ntt.chain,
-      description,
-      parallelizable,
+    const quote = await this.getExecutorQuote(
+      ctx.chain,
+      destination.chain,
+      amount,
     );
+
+    const transfer = await router.buildSendTokenTransaction(
+      amount,
+      senderAddress,
+      sourceToken,
+      destinationToken,
+      destination.chain,
+      destination.address.toString(),
+      quote,
+    );
+
+    yield new EvmUnsignedTransaction<N, C>(
+      addChainId(transfer, chainId),
+      ctx.network as N,
+      ctx.chain as C,
+      "M0 Extension Bridge",
+      false,
+    );
+
+    return;
   }
 
   async *transferSolanaExtension<N extends Network, C extends SolanaChains>(
-    ntt: SolanaNtt<N, C>,
+    ctx: ChainContext<Network>,
     sender: AccountAddress<C>,
     amount: bigint,
     recipient: ChainAddress,
     sourceToken: string,
     destinationToken: string,
-    options: Ntt.TransferOptions,
-    outboxItem?: Keypair,
   ): AsyncGenerator<SolanaUnsignedTransaction<N, C>> {
-    const router = new SolanaRoutes(ntt);
-
-    // Bridging from $M
-    if (router.getSolanaContracts().token === sourceToken) {
-      yield* ntt.transfer(sender, amount, recipient, options);
-      return;
-    }
-
-    const config = await ntt.getConfig();
-    if (config.paused) throw new Error("Contract is paused");
-
-    outboxItem = outboxItem ?? Keypair.generate();
-    const payerAddress = new SolanaAddress(sender).unwrap();
-    const sourceMint = new PublicKey(sourceToken);
+    const router = await SvmRouter.fromChainContext(ctx);
+    const tokenSender = new PublicKey(sender.address);
 
     // Convert principal amount to UI amount if mint has scaled-ui config
-    amount = await M0AutomaticRoute.applyScaledUiMultiplier(
-      ntt.connection,
-      sourceMint,
+    amount = await SvmRouter.applyScaledUiMultiplier(
+      router.connection,
+      new PublicKey(sourceToken),
       amount,
     );
 
-    // Use custom transfer instruction for extension tokens
+    // Use custom transfer instruction (not NTT)
     const ixs = [
-      router.getTransferExtensionBurnIx(
+      await router.buildSendTokenInstruction(
         amount,
-        recipient,
-        new PublicKey(sender.toUint8Array()),
-        outboxItem.publicKey,
-        sourceMint,
-        toUniversal(recipient.chain, destinationToken).toUint8Array(),
-        options.queue,
+        tokenSender,
+        sourceToken,
+        destinationToken,
+        recipient.chain,
+        recipient.address.toString(),
       ),
     ];
 
-    // Create release ix for each transceiver
-    for (let ix = 0; ix < ntt.transceivers.length; ++ix) {
-      if (ix === 0) {
-        const whTransceiver = await ntt.getWormholeTransceiver();
-        if (!whTransceiver) {
-          throw new Error("wormhole transceiver not found");
-        }
-        const releaseIx = await whTransceiver.createReleaseWormholeOutboundIx(
-          payerAddress,
-          outboxItem.publicKey,
-          !options.queue,
-        );
-        ixs.push(releaseIx);
-      }
-    }
-
-    const tx = new Transaction();
-    tx.feePayer = payerAddress;
-    tx.add(...ixs);
-
-    if (this.requiresExecutor(recipient.chain)) {
-      const quote = await this.getExecutorQuote(
-        ntt.chain,
+    // Request relay
+    ixs.push(
+      await router.buildExecutorRelayInstruction(
+        tokenSender,
+        await this.getExecutorQuote(ctx.chain, recipient.chain, amount),
         recipient.chain,
-        amount,
-      );
+      ),
+    );
 
-      tx.add(
-        await router.getExecutorRelayIx(payerAddress, quote, recipient.chain),
-      );
-    } else if (options.automatic) {
-      if (!ntt.quoter) {
-        throw new Error(
-          "No quoter available, cannot initiate an automatic transfer.",
-        );
-      }
-
-      const fee = await ntt.quoteDeliveryPrice(recipient.chain, options);
-
-      const relayIx = await ntt.quoter.createRequestRelayInstruction(
-        payerAddress,
-        outboxItem.publicKey,
-        recipient.chain,
-        Number(fee) / LAMPORTS_PER_SOL,
-        0,
-      );
-      tx.add(relayIx);
-    }
-
-    const luts: AddressLookupTableAccount[] = [];
-    try {
-      luts.push(await ntt.getAddressLookupTable());
-      luts.push(await router.getAddressLookupTableAccounts(ntt.connection));
-    } catch {}
+    // Get address table from Wormhole resolver
+    const lut = await router.getAddressLookupTableAccounts();
 
     const messageV0 = new TransactionMessage({
-      payerKey: payerAddress,
-      instructions: tx.instructions,
-      recentBlockhash: (await ntt.connection.getLatestBlockhash()).blockhash,
-    }).compileToV0Message(luts);
+      payerKey: tokenSender,
+      instructions: ixs,
+      recentBlockhash: (await router.connection.getLatestBlockhash()).blockhash,
+    }).compileToV0Message([lut]);
 
-    const vtx = new VersionedTransaction(messageV0);
-
-    yield ntt.createUnsignedTx(
-      { transaction: vtx, signers: [outboxItem] },
-      "Ntt.Transfer",
+    yield new SolanaUnsignedTransaction<N, C>(
+      { transaction: new VersionedTransaction(messageV0) },
+      ctx.network as N,
+      ctx.chain as C,
+      "M0 Extension Bridge",
+      false,
     );
+
+    return;
   }
 
   public override async *track(receipt: R, timeout?: number) {
@@ -598,11 +434,8 @@ export class M0AutomaticRoute<N extends Network>
 
     if (isSourceInitiated(receipt) || isSourceFinalized(receipt)) {
       const { txid } = receipt.originTxs[receipt.originTxs.length - 1]!;
-      const vaaType =
-        isEvmPlatform(receipt.from) && isEvmPlatform(receipt.to)
-          ? "Ntt:WormholeTransferStandardRelayer" // Automatic NTT transfers between EVM chains use standard relayers
-          : "Ntt:WormholeTransfer";
-      const vaa = await this.wh.getVaa(txid, vaaType, timeout);
+
+      const vaa = await this.wh.getVaa(txid, "Ntt:WormholeTransfer", timeout);
       if (!vaa) {
         throw new Error(`No VAA found for transaction: ${txid}`);
       }
@@ -681,11 +514,9 @@ export class M0AutomaticRoute<N extends Network>
     const routeInstance = new executorRoute(this.wh);
 
     const resolveM = (chain: Chain) => {
-      if (chainToPlatform(chain) === "Solana") {
-        const c = chain as SolanaChains;
-        return SolanaRoutes.getSolanaContracts(this.wh.network, c).token;
-      }
-      return M0AutomaticRoute.EVM_CONTRACTS.token;
+      if (chainToPlatform(chain) === "Solana")
+        return "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH";
+      return "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b";
     };
 
     const transferRequest = await routes.RouteTransferRequest.create(this.wh, {
@@ -707,40 +538,5 @@ export class M0AutomaticRoute<N extends Network>
       transferRequest,
       validated.params as NttExecutorRoute.ValidatedParams,
     );
-  }
-
-  private requiresExecutor(destination: Chain): boolean {
-    // Other SVM chains like Fogo are marked as Solana
-    return chainToPlatform(destination) === "Solana";
-  }
-
-  static async applyScaledUiMultiplier(
-    connection: Connection,
-    mint: PublicKey,
-    amount: bigint,
-  ): Promise<bigint> {
-    const mintAccountInfo = await connection.getAccountInfo(mint);
-    if (
-      !mintAccountInfo ||
-      !mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
-    ) {
-      return amount;
-    }
-
-    const mintData = unpackMint(mint, mintAccountInfo, TOKEN_2022_PROGRAM_ID);
-    const scaledUiAmountConfig = getScaledUiAmountConfig(mintData);
-    if (!scaledUiAmountConfig) {
-      return amount;
-    }
-
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const multiplier =
-      now >= scaledUiAmountConfig.newMultiplierEffectiveTimestamp
-        ? scaledUiAmountConfig.newMultiplier
-        : scaledUiAmountConfig.multiplier;
-
-    const PRECISION = 10n ** 12n;
-    const scaledMultiplier = BigInt(Math.round(multiplier * Number(PRECISION)));
-    return (amount * scaledMultiplier) / PRECISION;
   }
 }

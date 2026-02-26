@@ -1,744 +1,356 @@
 import {
-  createAssociatedTokenAccountInstruction,
-  TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
+  Chain,
+  ChainContext,
+  chainToChainId,
+  chainToPlatform,
+  Network,
+  sha256,
+  TokenId,
+  UniversalAddress,
+} from "@wormhole-foundation/sdk-connect";
+import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
+  svmPortalProvider,
+  svmSwapFacilityProvider,
+  svmWormholeAdapterProvider,
+} from "./artifacts";
+import {
+  AccountMeta,
   AddressLookupTableAccount,
   Connection,
   PublicKey,
   SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { getM0ChainId } from "./chainIds";
 import {
-  Chain,
-  ChainAddress,
-  chainToChainId,
-  Network,
-  toUniversal,
-} from "@wormhole-foundation/sdk-connect";
-import { SolanaChains } from "@wormhole-foundation/sdk-solana";
-import { NTT, SolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Ntt, NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
+  getAssociatedTokenAddressSync,
+  getScaledUiAmountConfig,
+  TOKEN_2022_PROGRAM_ID,
+  unpackMint,
+} from "@solana/spl-token";
 import BN from "bn.js";
-import { sha256 } from "@noble/hashes/sha2";
 
-type SvmNetwork = Exclude<Network, "Devnet">;
-
-type ExtensionDetails = {
-  program: PublicKey;
+type extensionToken = {
+  destinations: { [chainId: number]: Set<string> };
+  extensionProgram: PublicKey;
   tokenProgram: PublicKey;
+  mint: PublicKey;
 };
 
-export class SolanaRoutes<N extends Network, C extends SolanaChains> {
-  ntt: SolanaNtt<N, C>;
-  network: SvmNetwork;
-  programs: Record<string, PublicKey>;
-  extPrograms: Record<string, ExtensionDetails>;
+export class SvmRouter {
+  private static instance: SvmRouter | null = null;
+  static evmPeer = "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153";
 
-  constructor(ntt: SolanaNtt<N, C>) {
-    this.ntt = ntt;
-    this.network = ntt.network as SvmNetwork;
-    this.programs = SolanaRoutes.getPrograms(this.network);
-    this.extPrograms = SolanaRoutes.getExtPrograms(
-      this.network,
-      this.ntt.chain
+  constructor(
+    public connection: Connection,
+    public chain: Chain,
+    public network: Exclude<Network, "Devnet">,
+    private cachedLookupTable: AddressLookupTableAccount | null = null,
+    private tokens: Record<string, extensionToken> | null = null,
+  ) {}
+
+  static async fromChainContext(ctx: ChainContext<Network>) {
+    if (chainToPlatform(ctx.chain) !== "Solana") {
+      throw new Error(`Unsupported svm chain: ${ctx.chain}`);
+    }
+
+    if (!SvmRouter.instance) {
+      SvmRouter.instance = new SvmRouter(
+        await ctx.getRpc(),
+        ctx.chain,
+        ctx.network as Exclude<Network, "Devnet">,
+      );
+    }
+
+    return SvmRouter.instance;
+  }
+
+  async buildSendTokenInstruction(
+    amount: bigint,
+    sender: PublicKey,
+    sourceToken: string,
+    destinationToken: string,
+    destinationChain: Chain,
+    recipient: string,
+  ): Promise<TransactionInstruction> {
+    const extensions = await this.getSupportedExtensions();
+    const extension = extensions[sourceToken];
+
+    // Sender's token account
+    const extensionTokenAccount = getAssociatedTokenAddressSync(
+      extension.mint,
+      sender,
+      true,
+      extension.tokenProgram,
     );
+
+    return svmPortalProvider(this.connection)
+      .methods.sendToken(
+        new BN(amount),
+        SvmRouter.hexToBytes32(destinationToken),
+        getM0ChainId(destinationChain, this.network),
+        SvmRouter.hexToBytes32(recipient),
+      )
+      .accounts({
+        sender,
+        bridgeAdapter: svmWormholeAdapterProvider(this.connection).programId,
+        extensionMint: sourceToken,
+        extensionTokenAccount,
+        extensionProgram: extension.extensionProgram,
+        mTokenProgram: TOKEN_2022_PROGRAM_ID,
+        extensionTokenProgram: extension.tokenProgram,
+      })
+      .remainingAccounts(this.getRemainingAccounts())
+      .instruction();
   }
 
-  private static getPrograms(network: SvmNetwork): Record<string, PublicKey> {
-    return {
-      Mainnet: {
-        swap: pk("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
-        earn: pk("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
-        lut: pk("9JLRqBqkznKiSoNfotA4ywSRdnWb2fE76SiFrAfkaRCD"),
-        mMint: pk("mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"),
-        portal: pk("mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY"),
-        quoter: pk("Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"),
-      },
-      Testnet: {
-        swap: pk("MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH"),
-        earn: pk("mz2vDzjbQDUDXBH6FPF5s4odCJ4y8YLE5QWaZ8XdZ9Z"),
-        lut: pk("6GhuWPuAmiJeeSVsr58KjqHcAejJRndCx9BVtHkaYHUR"),
-        mMint: pk("mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"),
-        portal: pk("mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY"),
-        quoter: pk("Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ"),
-      },
-    }[network];
-  }
+  async getSupportedExtensions() {
+    if (this.tokens) {
+      return this.tokens;
+    }
 
-  private static getExtPrograms(
-    network: SvmNetwork,
-    chain: SolanaChains
-  ): Record<string, ExtensionDetails> {
-    if (chain === "Fogo") {
-      // Fogo addresses the same for devnet and mainnet
-      return {
-        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
-          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
-          tokenProgram: TOKEN_PROGRAM_ID,
-        },
+    const portalProgram = svmPortalProvider(this.connection);
+    const swapProgram = svmSwapFacilityProvider(this.connection);
+
+    // Extensions registered on the swap facility
+    const swapGlobal = await swapProgram.account.swapGlobal.fetch(
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("global")],
+        swapProgram.programId,
+      )[0],
+    );
+
+    this.tokens = {};
+
+    for (const ext of swapGlobal.whitelistedExtensions) {
+      this.tokens[ext.mint.toBase58()] = {
+        destinations: {},
+        extensionProgram: ext.programId,
+        tokenProgram: ext.tokenProgram,
+        mint: ext.mint,
       };
     }
 
-    return {
-      Mainnet: {
-        mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
-          program: pk("wMXX1K1nca5W4pZr1piETe78gcAVVrEFi9f4g46uXko"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        usdkbee86pkLyRmxfFCdkyySpxRb5ndCxVsK2BkRXwX: {
-          program: pk("extaykYu5AQcDm3qZAbiDN3yp6skqn6Nssj7veUUGZw"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        usdkyPPxgV7sfNyKb8eDz66ogPrkRXG3wS2FVb6LLUf: {
-          program: pk("extMahs9bUFMYcviKCvnSRaXgs5PcqmMzcnHRtTqE85"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-      },
-      Testnet: {
-        mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp: {
-          program: pk("wMXX1K1nca5W4pZr1piETe78gcAVVrEFi9f4g46uXko"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        usdkbee86pkLyRmxfFCdkyySpxRb5ndCxVsK2BkRXwX: {
-          program: pk("Fb2AsCKmPd4gKhabT6KsremSHMrJ8G2Mopnc6rDQZX9e"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        usdkyPPxgV7sfNyKb8eDz66ogPrkRXG3wS2FVb6LLUf: {
-          program: pk("3PskKTHgboCbUSQPMcCAZdZNFHbNvSoZ8zEFYANCdob7"),
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
-        },
-        fUSDqquEMUU8UmU2YWYGZy2Lda1oMzBc88Mkzc1PRDw: {
-          program: pk("extUkDFf3HLekkxbcZ3XRUizMjbxMJgKBay3p9xGVmg"),
-          tokenProgram: TOKEN_PROGRAM_ID,
-        },
-      },
-    }[network];
-  }
+    // Support bridging paths
+    const paths = await portalProgram.account.chainBridgePaths.all();
 
-  static getSolanaContracts(
-    network: Network,
-    chain: SolanaChains
-  ): Ntt.Contracts & { mLikeTokens: string[] } {
-    const programs = SolanaRoutes.getPrograms(network as SvmNetwork);
-    const extPrograms = SolanaRoutes.getExtPrograms(
-      network as SvmNetwork,
-      chain
-    );
-
-    return {
-      token: programs.mMint.toBase58(),
-      mLikeTokens: Object.keys(extPrograms),
-      manager: programs.portal.toBase58(),
-      transceiver: { wormhole: programs.portal.toBase58() },
-      quoter: programs.quoter.toBase58(),
-    };
-  }
-
-  getSolanaContracts(): Ntt.Contracts & { mLikeTokens: string[] } {
-    return SolanaRoutes.getSolanaContracts(this.network, this.ntt.chain);
-  }
-
-  getTransferExtensionBurnIx(
-    amount: bigint,
-    recipient: ChainAddress,
-    payer: PublicKey,
-    outboxItem: PublicKey,
-    extMint: PublicKey,
-    destinationToken: Uint8Array,
-    shouldQueue = true
-  ): TransactionInstruction {
-    const recipientAddress = toUniversal(
-      recipient.chain,
-      recipient.address.toString()
-    ).toUint8Array();
-
-    if (recipientAddress.length !== 32) {
-      throw new Error(
-        `recipient address must be 32 bytes, got ${recipientAddress.length} bytes`
-      );
-    }
-    if (destinationToken.length !== 32) {
-      throw new Error(
-        `destinationToken must be 32 bytes, got ${destinationToken.length} bytes`
-      );
+    // Get supported destinations for each extension
+    for (const path of paths) {
+      const { destinationChainId } = path.account;
+      for (const { sourceMint, destinationToken } of path.account.paths) {
+        const dests = this.tokens[sourceMint.toBase58()].destinations;
+        (dests[destinationChainId] ??= new Set()).add(
+          SvmRouter.bytes32toHex(destinationToken),
+        );
+      }
     }
 
-    const extension = this.extPrograms[extMint.toBase58()];
-    if (!extension) {
-      throw new Error(
-        `No extension program found for mint ${extMint.toBase58()}`
-      );
-    }
+    return this.tokens;
+  }
 
-    const { program: extProgram, tokenProgram: extTokenProgram } = extension;
-
-    const [tokenAuth] = PublicKey.findProgramAddressSync(
-      [Buffer.from("token_authority")],
-      this.programs.portal
-    );
-    const sessionAuth = this.ntt.pdas.sessionAuthority(tokenAuth, {
-      amount: new BN(amount),
-      recipientChain: { id: chainToChainId(recipient.chain) },
-      recipientAddress: [...recipientAddress],
-      shouldQueue,
+  async getSupportedSourceTokens(): Promise<TokenId[]> {
+    const extensions = await this.getSupportedExtensions();
+    const extensionsWithPath = Object.keys(extensions).filter((mint) => {
+      const dests = extensions[mint].destinations;
+      return Object.keys(dests).length > 0;
     });
 
-    return new TransactionInstruction({
-      programId: this.ntt.program.programId,
-      keys: [
-        {
-          pubkey: payer,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          // config
-          pubkey: this.ntt.pdas.configAccount(),
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // m mint
-          pubkey: this.programs.mMint,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // from (token auth m token account)
-          pubkey: getAssociatedTokenAddressSync(
-            this.programs.mMint,
-            tokenAuth,
-            true,
-            TOKEN_2022_PROGRAM_ID
-          ),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // m token program
-          pubkey: TOKEN_2022_PROGRAM_ID,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // outbox item
-          pubkey: outboxItem,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          // outbox rate limit
-          pubkey: this.ntt.pdas.outboxRateLimitAccount(),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // custody
-          pubkey: this.ntt.config!.custody,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // system program
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // inbox rate limit
-          pubkey: this.ntt.pdas.inboxRateLimitAccount(recipient.chain),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // peer
-          pubkey: this.ntt.pdas.peerAccount(recipient.chain),
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // session auth
-          pubkey: sessionAuth,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // token auth
-          pubkey: tokenAuth,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext mint
-          pubkey: extMint,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // swap global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            this.programs.swap
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // m global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            this.programs.earn
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext token account
-          pubkey: getAssociatedTokenAddressSync(
-            extMint,
-            payer,
-            true,
-            extTokenProgram
-          ),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext m vault
-          pubkey: getAssociatedTokenAddressSync(
-            this.programs.mMint,
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("m_vault")],
-              extProgram
-            )[0],
-            true,
-            TOKEN_2022_PROGRAM_ID
-          ),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext m vault auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("m_vault")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext mint auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("mint_authority")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext program
-          pubkey: extProgram,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // swap program
-          pubkey: this.programs.swap,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext token program
-          pubkey: extTokenProgram,
-          isSigner: false,
-          isWritable: false,
-        },
-      ],
-      data: Buffer.concat([
-        Buffer.from(sha256("global:transfer_extension_burn").subarray(0, 8)),
-        new BN(amount).toArrayLike(Buffer, "le", 8), // amount
-        new BN(chainToChainId(recipient.chain)).toArrayLike(Buffer, "le", 2), // chain_id
-        recipientAddress, // recipient_address
-        Buffer.from([Number(shouldQueue)]), // should_queue
-        destinationToken, // destination_token
-      ]),
-    });
+    return extensionsWithPath.map((mint) => ({
+      chain: this.chain,
+      address: new UniversalAddress(mint, "base58"),
+    }));
   }
 
-  async getExecutorRelayIx(
+  async getSupportedDestinationTokens(
+    sourceToken: string,
+    toChain: Chain,
+  ): Promise<TokenId[]> {
+    const extensions = await this.getSupportedExtensions();
+    const extension = extensions[sourceToken];
+    if (!extension) return [];
+
+    const chainId = getM0ChainId(toChain, this.network);
+    const dests = extension.destinations[chainId];
+    if (!dests) return [];
+
+    return Array.from(dests).map((dest) => ({
+      chain: toChain,
+      address: new UniversalAddress(dest, "hex"),
+    }));
+  }
+
+  async getAddressLookupTableAccounts(): Promise<AddressLookupTableAccount> {
+    if (this.cachedLookupTable) return this.cachedLookupTable;
+
+    // Fetch the address table from the wormhole adapter's global state
+    const program = svmWormholeAdapterProvider(this.connection);
+    const globalInfo = await program.account.wormholeGlobal.fetch(
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("global")],
+        program.programId,
+      )[0],
+    );
+
+    // Fetch the address table account
+    const info = await this.connection.getAccountInfo(globalInfo!.receiveLut!);
+
+    this.cachedLookupTable = new AddressLookupTableAccount({
+      key: globalInfo!.receiveLut!,
+      state: AddressLookupTableAccount.deserialize(info!.data),
+    });
+
+    return this.cachedLookupTable;
+  }
+
+  async buildExecutorRelayInstruction(
     sender: PublicKey,
     quote: NttWithExecutor.Quote,
-    destinationChain: Chain
+    destinationChain: Chain,
   ): Promise<TransactionInstruction> {
     const emitter = PublicKey.findProgramAddressSync(
       [Buffer.from("emitter")],
-      this.ntt.program.programId
+      svmWormholeAdapterProvider(this.connection).programId,
     )[0];
 
     const bridgeSequence = PublicKey.findProgramAddressSync(
       [Buffer.from("Sequence"), emitter.toBytes()],
-      new PublicKey(this.ntt.contracts.coreBridge!)
+      this.network === "Mainnet"
+        ? new PublicKey("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth")
+        : new PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"),
     )[0];
 
-    const info = await this.ntt.connection.getAccountInfo(bridgeSequence);
+    // Fetch the current sequence for relaying
+    const info = await this.connection.getAccountInfo(bridgeSequence);
     const sequence = new BN(info!.data, "le");
 
     const vaaReqBytes = Buffer.concat([
-      Buffer.from("ERV1"), // type
-      new BN(chainToChainId(this.ntt.chain)).toArrayLike(Buffer, "be", 2), // emitter chain
-      emitter.toBuffer(), // emitter address
-      sequence.toArrayLike(Buffer, "be", 8), // sequence
+      Buffer.from("ERV1"),
+      new BN(chainToChainId(this.chain)).toArrayLike(Buffer, "be", 2),
+      emitter.toBuffer(),
+      sequence.toArrayLike(Buffer, "be", 8),
     ]);
 
     const signedQuoteBytes = Buffer.from(quote.signedQuote);
     const relayInstructions = Buffer.from(quote.relayInstructions);
+    const payee = new PublicKey(quote.payeeAddress);
+
+    // Encoding vectors
+    const lengthPrefixed = (buf: Buffer) =>
+      Buffer.concat([new BN(buf.length).toArrayLike(Buffer, "le", 4), buf]);
 
     return new TransactionInstruction({
       keys: [
-        {
-          pubkey: sender,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          // payee
-          pubkey: new PublicKey(quote.payeeAddress),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
+        { pubkey: sender, isSigner: true, isWritable: true },
+        { pubkey: payee, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       programId: new PublicKey("execXUrAsMnqMmTHj5m7N1YQgsDz3cwGLYCYyuDRciV"),
       data: Buffer.concat([
-        Buffer.from(sha256("global:request_for_execution").subarray(0, 8)), // [109, 107, 87, 37, 151, 192, 119, 115]
-        new BN(quote.estimatedCost.toString()).toArrayLike(Buffer, "le", 8), // amount
-        new BN(chainToChainId(destinationChain)).toArrayLike(Buffer, "le", 2), // dst_chain
-        this.ntt.program.programId.toBuffer(), // peer portal address
-        sender.toBuffer(), // refund_addr
-        new BN(signedQuoteBytes.length).toArrayLike(Buffer, "le", 4), // vec length
-        signedQuoteBytes, // signed_quote_bytes
-        new BN(vaaReqBytes.length).toArrayLike(Buffer, "le", 4), // vec length
-        vaaReqBytes, // request_bytes
-        new BN(relayInstructions.length).toArrayLike(Buffer, "le", 4), // vec length
-        relayInstructions, // relay_instructions
+        Buffer.from(sha256("global:request_for_execution").subarray(0, 8)),
+        new BN(quote.estimatedCost.toString()).toArrayLike(Buffer, "le", 8),
+        new BN(chainToChainId(destinationChain)).toArrayLike(Buffer, "le", 2),
+        Buffer.from(SvmRouter.hexToBytes32(SvmRouter.evmPeer)),
+        sender.toBuffer(),
+        lengthPrefixed(signedQuoteBytes),
+        lengthPrefixed(vaaReqBytes),
+        lengthPrefixed(relayInstructions),
       ]),
     });
   }
 
-  getReleaseInboundMintExtensionIx(
-    nttMessage: Ntt.Message,
-    emitterChain: Chain,
-    payer: PublicKey,
-    extMint: PublicKey,
-    extAta: PublicKey
-  ): TransactionInstruction {
-    const extension = this.extPrograms[extMint.toBase58()];
-    if (!extension) {
-      throw new Error(
-        `No extension program found for mint ${extMint.toBase58()}`
-      );
-    }
+  private getRemainingAccounts(): AccountMeta[] {
+    const adapter = svmWormholeAdapterProvider(null as any).programId;
 
-    const { program: extProgram, tokenProgram: extTokenProgram } = extension;
+    // Wormhole network-specific accounts
+    const bridgePrograms = {
+      Mainnet: {
+        config: new PublicKey("2yVjuQwpsvdsrywzsJJVs9Ueh4zayyo5DYJbBNc3DDpn"),
+        core: new PublicKey("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth"),
+        fee: new PublicKey("9bFNrXNb2WTx8fMHXCheaZqkLZ3YCCaiqTftHxeintHy"),
+        shim: new PublicKey("EtZMZM22ViKMo4r5y4Anovs3wKQ2owUmDpjygnMMcdEX"),
+      },
+      Testnet: {
+        config: new PublicKey("6bi4JGDoRwUs9TYBuvoA7dUVyikTJDrJsJU1ew6KVLiu"),
+        core: new PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"),
+        fee: new PublicKey("7s3a1ycs16d6SNDumaRtjcoyMaTDZPavzgsmS3uUZYWX"),
+        shim: new PublicKey("EtZMZM22ViKMo4r5y4Anovs3wKQ2owUmDpjygnMMcdEX"),
+      },
+    }[this.network];
 
-    return new TransactionInstruction({
-      programId: this.ntt.program.programId,
-      keys: [
-        {
-          pubkey: payer,
-          isSigner: true,
-          isWritable: true,
-        },
-        {
-          // config
-          pubkey: this.ntt.pdas.configAccount(),
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // inbox item
-          pubkey: this.ntt.pdas.inboxItemAccount(emitterChain, nttMessage),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // recipient (mint to token auth which wraps to user)
-          pubkey: getAssociatedTokenAddressSync(
-            this.ntt.config!.mint,
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("token_authority")],
-              this.ntt.program.programId
-            )[0],
-            true,
-            TOKEN_2022_PROGRAM_ID
-          ),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // token auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("token_authority")],
-            this.ntt.program.programId
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // m mint
-          pubkey: this.ntt.config!.mint,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // m token program
-          pubkey: TOKEN_2022_PROGRAM_ID,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // custody
-          pubkey: this.ntt.config!.custody,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // earn program
-          pubkey: this.programs.earn,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // m global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            this.programs.earn
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext mint
-          pubkey: extMint,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // swap global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            this.programs.swap
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext global
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext m vault auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("m_vault")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext mint auth
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("mint_authority")],
-            extProgram
-          )[0],
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext m vault
-          pubkey: getAssociatedTokenAddressSync(
-            this.ntt.config!.mint,
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("m_vault")],
-              extProgram
-            )[0],
-            true,
-            TOKEN_2022_PROGRAM_ID
-          ),
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext token account
-          pubkey: extAta,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          // ext token account
-          pubkey: this.programs.swap,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext program
-          pubkey: extProgram,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // ext token program
-          pubkey: extTokenProgram,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          // system program
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-      ],
-      data: Buffer.concat([
-        Buffer.from(
-          sha256("global:release_inbound_mint_extension").subarray(0, 8)
-        ),
-      ]),
-    });
-  }
-
-  async getAddressLookupTableAccounts(
-    connection: Connection
-  ): Promise<AddressLookupTableAccount> {
-    const info = await connection.getAccountInfo(this.programs.lut);
-
-    return new AddressLookupTableAccount({
-      key: this.programs.lut,
-      state: AddressLookupTableAccount.deserialize(info!.data),
-    });
-  }
-
-  static async createReleaseInboundMintInstruction<
-    N extends Network,
-    C extends SolanaChains
-  >(
-    ntt: SolanaNtt<N, C>,
-    args: {
-      payer: PublicKey;
-      chain: Chain;
-      nttMessage: Ntt.Message;
-      recipient: PublicKey;
-      revertWhenNotReady: boolean;
-    }
-  ): Promise<TransactionInstruction[]> {
-    const router = new SolanaRoutes(ntt);
-
-    // get target extension from ntt payload
-    const { additionalPayload } = args.nttMessage.payload;
-
-    if (additionalPayload.length < 40) {
-      throw new Error(
-        `Invalid additionalPayload length: ${additionalPayload.length}, expected at least 40 bytes`
-      );
-    }
-
-    const destinationMint = new PublicKey(
-      // first 8 bytes is the index, next 32 bytes is the mint address
-      additionalPayload.slice(8, 40)
+    // PDAs
+    const [wormholeGlobal] = PublicKey.findProgramAddressSync(
+      [Buffer.from("global")],
+      adapter,
+    );
+    const [shimEa] = PublicKey.findProgramAddressSync(
+      [Buffer.from("__event_authority")],
+      bridgePrograms.shim,
+    );
+    const [emitter] = PublicKey.findProgramAddressSync(
+      [Buffer.from("emitter")],
+      adapter,
+    );
+    const [sequence] = PublicKey.findProgramAddressSync(
+      [Buffer.from("Sequence"), emitter.toBytes()],
+      bridgePrograms.core,
+    );
+    const [message] = PublicKey.findProgramAddressSync(
+      [emitter.toBytes()],
+      bridgePrograms.shim,
     );
 
-    // bridge to $M, use standard release instruction
-    if (destinationMint.equals(ntt.config!.mint)) {
-      const ix = await NTT.createReleaseInboundMintInstruction(
-        ntt.program,
-        ntt.config!,
-        args
-      );
-
-      // add extra accounts required for index propagation
-      ix.keys.push(
-        {
-          pubkey: router.programs.earn,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
-          pubkey: PublicKey.findProgramAddressSync(
-            [Buffer.from("global")],
-            router.programs.earn
-          )[0],
-          isSigner: false,
-          isWritable: true,
-        }
-      );
-
-      return [ix];
-    }
-
-    const extPrograms = router.extPrograms[destinationMint.toBase58()];
-    if (!extPrograms) {
-      throw new Error(
-        `No extension program found for mint ${destinationMint.toBase58()}`
-      );
-    }
-
-    const extAta = getAssociatedTokenAddressSync(
-      destinationMint,
-      args.recipient,
-      true,
-      extPrograms.tokenProgram
-    );
-
-    const ixs: TransactionInstruction[] = [];
-
-    const acctInfo = await ntt.connection.getAccountInfo(extAta);
-    if (acctInfo === null) {
-      ixs.push(
-        createAssociatedTokenAccountInstruction(
-          args.payer,
-          extAta,
-          args.recipient,
-          destinationMint,
-          extPrograms.tokenProgram
-        )
-      );
-    }
-
-    ixs.push(
-      router.getReleaseInboundMintExtensionIx(
-        args.nttMessage,
-        args.chain,
-        args.payer,
-        destinationMint,
-        extAta
-      )
-    );
-
-    return ixs;
+    return [
+      { pubkey: wormholeGlobal, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.config, isSigner: false, isWritable: true },
+      { pubkey: message, isSigner: false, isWritable: true },
+      { pubkey: emitter, isSigner: false, isWritable: false },
+      { pubkey: sequence, isSigner: false, isWritable: true },
+      { pubkey: bridgePrograms.fee, isSigner: false, isWritable: true },
+      { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.core, isSigner: false, isWritable: false },
+      { pubkey: shimEa, isSigner: false, isWritable: false },
+      { pubkey: bridgePrograms.shim, isSigner: false, isWritable: false },
+    ];
   }
-}
 
-function pk(address: string): PublicKey {
-  return new PublicKey(address);
+  static async applyScaledUiMultiplier(
+    connection: Connection,
+    mint: PublicKey,
+    amount: bigint,
+  ): Promise<bigint> {
+    const mintAccountInfo = await connection.getAccountInfo(mint);
+    if (
+      !mintAccountInfo ||
+      !mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ) {
+      return amount;
+    }
+
+    const mintData = unpackMint(mint, mintAccountInfo, TOKEN_2022_PROGRAM_ID);
+    const scaledUiAmountConfig = getScaledUiAmountConfig(mintData);
+    if (!scaledUiAmountConfig) {
+      return amount;
+    }
+
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const multiplier =
+      now >= scaledUiAmountConfig.newMultiplierEffectiveTimestamp
+        ? scaledUiAmountConfig.newMultiplier
+        : scaledUiAmountConfig.multiplier;
+
+    const PRECISION = 10n ** 12n;
+    const scaledMultiplier = BigInt(Math.round(multiplier * Number(PRECISION)));
+    return (amount * scaledMultiplier) / PRECISION;
+  }
+
+  static hexToBytes32(hex: string): number[] {
+    const bytes = Buffer.from(hex.replace("0x", ""), "hex");
+    return Array.from(Buffer.concat([Buffer.alloc(32 - bytes.length), bytes]));
+  }
+
+  static bytes32toHex(bytes: number[]): string {
+    return "0x" + Buffer.from(bytes.slice(12)).toString("hex");
+  }
 }
