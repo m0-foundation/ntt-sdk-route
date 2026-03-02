@@ -20,7 +20,7 @@ const ERC20_ABI = [
 export class EvmRouter {
   private static instance: EvmRouter | null = null;
 
-  private WORMHOLE_ADAPTER = "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153";
+  private WORMHOLE_ADAPTER = "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd";
   private static PORTAL_ADDRESS = "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd";
 
   private TOKENS = [

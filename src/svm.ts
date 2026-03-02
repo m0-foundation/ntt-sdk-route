@@ -41,7 +41,7 @@ type extensionToken = {
 
 export class SvmRouter {
   private static instance: SvmRouter | null = null;
-  static evmPeer = "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153";
+  static evmPeer = "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd";
 
   constructor(
     public connection: Connection,

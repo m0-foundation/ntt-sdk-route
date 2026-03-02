@@ -22,7 +22,6 @@ import {
   isSourceInitiated,
   routes,
   signSendWait,
-  toChainId,
 } from "@wormhole-foundation/sdk-connect";
 import { register as registerNttDefinitions } from "@wormhole-foundation/sdk-definitions-ntt";
 import { register as registerEvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
@@ -417,6 +416,12 @@ export class M0AutomaticRoute<N extends Network>
       instructions: ixs,
       recentBlockhash: (await router.connection.getLatestBlockhash()).blockhash,
     }).compileToV0Message([lut]);
+
+    const buff = new VersionedTransaction(messageV0).serialize();
+    console.log(
+      "Serialized transaction: ",
+      Buffer.from(buff).toString("base64"),
+    );
 
     yield new SolanaUnsignedTransaction<N, C>(
       { transaction: new VersionedTransaction(messageV0) },
