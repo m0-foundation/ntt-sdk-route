@@ -417,12 +417,6 @@ export class M0AutomaticRoute<N extends Network>
       recentBlockhash: (await router.connection.getLatestBlockhash()).blockhash,
     }).compileToV0Message([lut]);
 
-    const buff = new VersionedTransaction(messageV0).serialize();
-    console.log(
-      "Serialized transaction: ",
-      Buffer.from(buff).toString("base64"),
-    );
-
     yield new SolanaUnsignedTransaction<N, C>(
       { transaction: new VersionedTransaction(messageV0) },
       ctx.network as N,
