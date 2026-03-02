@@ -1,19 +1,15 @@
-import { chain, Chain, Network } from "@wormhole-foundation/sdk-connect";
+import { Chain, Network } from "@wormhole-foundation/sdk-connect";
 import { NttExecutorRoute, NttRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { SolanaRoutes } from "./svm";
-import { M0AutomaticRoute } from "./m0AutomaticRoute";
+import { PublicKey } from "@solana/web3.js";
 
 export function getExecutorConfig(
-  network: Network = "Mainnet"
+  network: Network = "Mainnet",
 ): NttExecutorRoute.Config {
-  // core programs the same for Fogo and Solana
-  const svmContracts = SolanaRoutes.getSolanaContracts(network, "Solana");
-
-  const svmChains: Chain[] = ["Solana", "Fogo"];
+  const svmChains: Chain[] = ["Solana"];
   const evmChains: Chain[] =
     network === "Mainnet"
-      ? ["Ethereum", "Optimism", "Arbitrum", "Base"]
-      : ["Sepolia", "ArbitrumSepolia", "OptimismSepolia", "BaseSepolia"];
+      ? ["Ethereum", "Arbitrum", "Base"]
+      : ["Sepolia", "ArbitrumSepolia", "BaseSepolia"];
 
   return {
     ntt: {
@@ -21,27 +17,26 @@ export function getExecutorConfig(
         M0: [
           ...svmChains.map((chain) => ({
             chain,
-            token: svmContracts.token,
-            manager: svmContracts.manager,
+            token: "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH",
+            manager: "mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY",
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
-                address: svmContracts.transceiver.wormhole,
+                address: PublicKey.default.toBase58(),
               },
             ],
-            quoter: svmContracts.quoter,
+            quoter: "Nqd6XqA8LbsCuG8MLWWuP865NV6jR1MbXeKxD4HLKDJ",
           })),
           ...evmChains.map((chain) => ({
             chain,
-            token: M0AutomaticRoute.EVM_CONTRACTS.token,
-            manager: M0AutomaticRoute.EVM_CONTRACTS.manager,
+            token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
+            manager: "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd",
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
-                address: M0AutomaticRoute.EVM_CONTRACTS.transceiver.wormhole,
+                address: "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd",
               },
             ],
-            quoter: M0AutomaticRoute.EVM_CONTRACTS.quoter,
           })),
         ],
       },
@@ -49,15 +44,8 @@ export function getExecutorConfig(
     referrerFee: {
       feeDbps: 0n,
       perTokenOverrides: {
-        // SVM chains require extra compute when receiving messages
-        // so we need to override the gas cost
         Solana: {
-          [svmContracts.token]: {
-            msgValue: 15_000_000n,
-          },
-        },
-        Fogo: {
-          [svmContracts.token]: {
+          ["mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"]: {
             msgValue: 15_000_000n,
           },
         },

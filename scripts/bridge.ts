@@ -21,11 +21,12 @@ import { M0AutomaticRoute } from "../src/m0AutomaticRoute";
 const wM = {
   Solana: "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp",
   Sepolia: "0x437cc33344a0B27A429f795ff6B469C72698B291",
+  BaseSepolia: "0x437cc33344a0B27A429f795ff6B469C72698B291",
 };
 
 (async () => {
-  const sourceChain = "Sepolia";
-  const destinationChain = "Solana";
+  const sourceChain = "Solana";
+  const destinationChain = "BaseSepolia";
 
   await bridge({
     network: "Testnet",
@@ -33,7 +34,7 @@ const wM = {
     sourceToken: wM[sourceChain],
     destinationChain,
     destinationToken: wM[destinationChain],
-    amount: "0.1",
+    amount: "0.01",
   });
 })();
 
@@ -58,12 +59,16 @@ async function bridge(params: {
     source: Wormhole.tokenId(params.sourceChain, params.sourceToken),
     destination: Wormhole.tokenId(
       params.destinationChain,
-      params.destinationToken
+      params.destinationToken,
     ),
   });
 
   // resolve the transfer request to a set of routes that can perform it
   const foundRoutes = await resolver.findRoutes(tr);
+  if (foundRoutes.length === 0) {
+    throw new Error("No routes found");
+  }
+
   const route = foundRoutes[0];
 
   const validated = await route.validate(tr, {
@@ -79,14 +84,14 @@ async function bridge(params: {
     tr,
     srcSigner.signer,
     quote,
-    dstSigner.address
+    dstSigner.address,
   );
 
   console.log("Initiated transfer: ", receipt);
 }
 
 async function getSigner<N extends Network, C extends Chain>(
-  chain: ChainContext<N, C>
+  chain: ChainContext<N, C>,
 ): Promise<{ address: ChainAddress<C>; signer: Signer<N, C> }> {
   const platform = chainToPlatform(chain.chain);
   let signer: Signer;
@@ -94,18 +99,20 @@ async function getSigner<N extends Network, C extends Chain>(
     case "Solana":
       signer = await solana.getSigner(
         await chain.getRpc(),
-        process.env.SOLANA_PRIVATE_KEY!
+        process.env.SOLANA_PRIVATE_KEY!,
       );
       break;
     case "Evm":
       signer = await evm.getSigner(
         await chain.getRpc(),
-        process.env.PRIVATE_KEY!
+        process.env.PRIVATE_KEY!,
       );
       break;
     default:
       throw new Error("Unrecognized platform: " + platform);
   }
+
+  console.debug(`Using signer ${signer.address()} on chain ${chain.chain}`);
 
   return {
     signer: signer as Signer<N, C>,
