@@ -91,12 +91,11 @@ export class M0AutomaticRoute<N extends Network>
   static supportedChains(network: Network): Chain[] {
     switch (network) {
       case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Optimism", "Base", "Solana"];
+        return ["Ethereum", "Arbitrum","Base", "Solana"];
       case "Testnet":
         return [
           "Sepolia",
           "ArbitrumSepolia",
-          "OptimismSepolia",
           "BaseSepolia",
           "Solana",
         ];
@@ -108,11 +107,9 @@ export class M0AutomaticRoute<N extends Network>
   static getContracts(chainContext: ChainContext<Network>): Ntt.Contracts {
     switch (chainContext.chain) {
       case "Ethereum":
-      case "Optimism":
       case "Arbitrum":
       case "Base":
       case "Sepolia":
-      case "OptimismSepolia":
       case "ArbitrumSepolia":
       case "BaseSepolia":
         return {
