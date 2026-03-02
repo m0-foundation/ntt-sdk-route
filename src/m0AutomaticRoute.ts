@@ -119,7 +119,7 @@ export class M0AutomaticRoute<N extends Network>
           token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
           manager: "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd",
           transceiver: {
-            wormhole: "0x0763196A091575adF99e2306E5e90E0Be5154841",
+            wormhole: "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd",
           },
         };
       case "Solana":
