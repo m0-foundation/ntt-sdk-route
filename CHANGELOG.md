@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.27
+
+### Patch Changes
+
+- f7c9001: fix: use native addresses in getSupportedSourceTokens and getSupportedDestinationTokens
+
 ## 0.0.24
 
 ### Patch Changes
