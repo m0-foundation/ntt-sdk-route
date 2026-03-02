@@ -30,11 +30,11 @@ export function getExecutorConfig(
           ...evmChains.map((chain) => ({
             chain,
             token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
-            manager: "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153",
+            manager: "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd",
             transceiver: [
               {
                 type: "wormhole" as NttRoute.TransceiverType,
-                address: "0xeAae496BcDa93cCCd3fD6ff6096347979e87B153",
+                address: "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd",
               },
             ],
           })),
