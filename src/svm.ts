@@ -6,7 +6,7 @@ import {
   Network,
   sha256,
   TokenId,
-  UniversalAddress,
+  toNative,
 } from "@wormhole-foundation/sdk-connect";
 import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 import {
@@ -159,7 +159,7 @@ export class SvmRouter {
 
     return extensionsWithPath.map((mint) => ({
       chain: this.chain,
-      address: new UniversalAddress(mint, "base58"),
+      address: toNative(this.chain, mint),
     }));
   }
 
@@ -177,7 +177,7 @@ export class SvmRouter {
 
     return Array.from(dests).map((dest) => ({
       chain: toChain,
-      address: new UniversalAddress(dest, "hex"),
+      address: toNative(toChain, dest),
     }));
   }
 

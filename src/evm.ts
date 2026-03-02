@@ -4,7 +4,7 @@ import {
   chainToPlatform,
   Network,
   TokenId,
-  UniversalAddress,
+  toNative,
 } from "@wormhole-foundation/sdk-connect";
 import { Contract, ContractTransaction, type Provider } from "ethers";
 import { evmPortalProvider } from "./artifacts";
@@ -39,7 +39,7 @@ export class EvmRouter {
   async getSupportedSourceTokens(): Promise<TokenId[]> {
     return this.TOKENS.map((token) => ({
       chain: this.chain,
-      address: new UniversalAddress(token, "hex"),
+      address: toNative(this.chain, token),
     }));
   }
 
@@ -51,17 +51,14 @@ export class EvmRouter {
       return [
         {
           chain: toChain,
-          address: new UniversalAddress(
-            "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp",
-            "base58",
-          ),
+          address: toNative(toChain, "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp"),
         },
       ];
     }
 
     return this.TOKENS.map((token) => ({
       chain: toChain,
-      address: new UniversalAddress(token, "hex"),
+      address: toNative(toChain, token),
     }));
   }
 
