@@ -261,7 +261,7 @@ export class SvmRouter {
   }
 
   private getRemainingAccounts(): AccountMeta[] {
-    const adapter = svmWormholeAdapterProvider(null as any).programId;
+    const adapter = svmWormholeAdapterProvider(this.connection).programId;
 
     // Wormhole network-specific accounts
     const bridgePrograms = {
