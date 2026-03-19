@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.29
+
+### Patch Changes
+
+- 9dbb027: update license to BSL 1.1
+
 ## 0.0.28
 
 ### Patch Changes
