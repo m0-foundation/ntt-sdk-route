@@ -9,7 +9,7 @@
     },
     "./package.json": "./package.json"
   },
-  "license": "Apache-2.0",
+  "license": "BUSL-1.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/m0-foundation/ntt-sdk-route.git"
