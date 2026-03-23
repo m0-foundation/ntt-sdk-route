@@ -46,7 +46,13 @@ export function getExecutorConfig(
       perTokenOverrides: {
         Solana: {
           ["mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH"]: {
-            msgValue: 15_000_000n,
+            msgValue: 4_500_000n,
+            gasLimit: 450_000n,
+          },
+        },
+        Ethereum: {
+          ["0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b"]: {
+            gasLimit: 600_000n,
           },
         },
       },
