@@ -1,4 +1,4 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { Connection, Keypair } from "@solana/web3.js";
 import { Portal } from "./idls/portal";
 import PORTAL from "./idls/portal.json";
@@ -18,13 +18,15 @@ function dummyWallet() {
   } as any;
 }
 
-function createProgram<T>(connection: Connection, idl: any): Program<T> {
+function createProgram<T extends Idl = Idl>(
+  connection: Connection,
+  idl: any,
+): Program<T> {
   return new Program<T>(idl, new AnchorProvider(connection, dummyWallet()));
 }
 
-export const svmPortalProvider = (
-  connection: Connection,
-): Program<Portal> => createProgram<Portal>(connection, PORTAL);
+export const svmPortalProvider = (connection: Connection): Program<Portal> =>
+  createProgram<Portal>(connection, PORTAL);
 
 export const svmWormholeAdapterProvider = (
   connection: Connection,
