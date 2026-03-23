@@ -1,5 +1,11 @@
 # @m0-foundation/ntt-sdk-route
 
+## 0.0.30
+
+### Patch Changes
+
+- 441e35d: Fix gas overrides
+
 ## 0.0.29
 
 ### Patch Changes
