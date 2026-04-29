@@ -20,9 +20,9 @@ import {
   isRedeemed,
   isSourceFinalized,
   isSourceInitiated,
-  routes,
   signSendWait,
 } from "@wormhole-foundation/sdk-connect";
+import * as routes from "@wormhole-foundation/sdk-connect/routes";
 import { register as registerNttDefinitions } from "@wormhole-foundation/sdk-definitions-ntt";
 import { register as registerEvmNtt } from "@wormhole-foundation/sdk-evm-ntt";
 import { register as registerSolanaNtt } from "@wormhole-foundation/sdk-solana-ntt";
@@ -65,17 +65,34 @@ type Q = routes.Quote<Op, Vp>;
 
 type R = NttRoute.AutomaticTransferReceipt;
 
+let registered = false;
+function ensureM0Registered(): void {
+  if (registered) return;
+  registered = true;
+  registerNttDefinitions();
+  registerEvmNtt();
+  registerSolanaNtt();
+}
+
+/**
+ * Factory for M0AutomaticRoute. Calling this is the supported way to obtain
+ * the route constructor — it ensures NTT protocol implementations are
+ * registered with the Wormhole SDK before any route construction. Idempotent.
+ *
+ * Add the result to your Wormhole Connect routes config:
+ *
+ *   import { m0AutomaticRoute } from "@m0-foundation/ntt-sdk-route";
+ *   const config = { routes: [m0AutomaticRoute(), ...] };
+ */
+export function m0AutomaticRoute(): routes.RouteConstructor {
+  ensureM0Registered();
+  return M0AutomaticRoute as routes.RouteConstructor;
+}
+
 export class M0AutomaticRoute<N extends Network>
   extends routes.AutomaticRoute<N, Op, Vp, R>
   implements routes.StaticRouteMethods<typeof M0AutomaticRoute>
 {
-  static {
-    // Register NTT protocol handlers with the SDK
-    registerNttDefinitions();
-    registerEvmNtt();
-    registerSolanaNtt();
-  }
-
   static NATIVE_GAS_DROPOFF_SUPPORTED: boolean = false;
   static EXECUTOR_ENTRYPOINT = "0x22f04a6cd935bfa3b4d000a4e3d4079adb148198";
   static meta = { name: "M0AutomaticRoute", provider: "M0" };
