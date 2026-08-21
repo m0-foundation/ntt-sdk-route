@@ -54,6 +54,8 @@ import { getExecutorConfig } from "./executor";
 import { SvmRouter } from "./svm";
 import { EvmRouter } from "./evm";
 import { getM0ChainId } from "./chainIds";
+import { hasAnyPath, knownChains } from "./paths";
+import { GENERATED_AT } from "./generated/supportedPaths";
 
 type Op = NttRoute.Options;
 type Tp = routes.TransferParams<Op>;
@@ -105,31 +107,27 @@ export class M0AutomaticRoute<N extends Network>
     return platform == "Evm" || platform == "Solana";
   }
 
+  /**
+   * Derived from the generated path table rather than hand-maintained — a chain
+   * belongs here only if the Portal has at least one live path touching it.
+   */
   static supportedChains(network: Network): Chain[] {
-    switch (network) {
-      case "Mainnet":
-        return ["Ethereum", "Arbitrum", "Base", "Moca", "Solana"];
-      case "Testnet":
-        return [
-          "Sepolia",
-          "ArbitrumSepolia",
-          "BaseSepolia",
-          "Solana",
-        ];
-      default:
-        throw new Error(`Unsupported network: ${network}`);
-    }
+    return knownChains(network);
   }
 
+  /** When the bundled path table was generated, for diagnostics. */
+  static get pathsGeneratedAt(): string {
+    return GENERATED_AT;
+  }
+
+  /**
+   * M0 deploys the Portal and the M/wM tokens at the same addresses on every EVM
+   * chain, so these are resolved by platform. Enumerating chains here instead
+   * would mean this list and `supportedChains` could drift apart.
+   */
   static getContracts(chainContext: ChainContext<Network>): Ntt.Contracts {
-    switch (chainContext.chain) {
-      case "Ethereum":
-      case "Arbitrum":
-      case "Base":
-      case "Moca":
-      case "Sepolia":
-      case "ArbitrumSepolia":
-      case "BaseSepolia":
+    switch (chainToPlatform(chainContext.chain)) {
+      case "Evm":
         return {
           token: "0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b",
           manager: "0xD925C84b55E4e44a53749fF5F2a5A13F63D128fd",
@@ -147,6 +145,21 @@ export class M0AutomaticRoute<N extends Network>
       default:
         throw new Error(`Unsupported chain: ${chainContext.chain}`);
     }
+  }
+
+  /** Whether the Portal has this exact (source token, chain, destination token) registered. */
+  static async isSupportedPath<N extends Network>(
+    fromChain: ChainContext<N>,
+    toChain: ChainContext<N>,
+    sourceToken: string,
+    destinationToken: string,
+  ): Promise<boolean> {
+    if (chainToPlatform(fromChain.chain) === "Solana") {
+      const router = await SvmRouter.fromChainContext(fromChain);
+      return router.isSupportedPath(sourceToken, toChain.chain, destinationToken);
+    }
+    const router = await EvmRouter.fromChainContext(fromChain);
+    return router.isSupportedPath(sourceToken, toChain.chain, destinationToken);
   }
 
   static async supportedSourceTokens(
@@ -190,44 +203,89 @@ export class M0AutomaticRoute<N extends Network>
     );
   }
 
+  /** Cheap pre-filter: no known path between this pair means nothing to offer. */
+  static isRouteSupported<N extends Network>(
+    fromChain: ChainContext<N>,
+    toChain: ChainContext<N>,
+  ): boolean {
+    return hasAnyPath(fromChain.network, fromChain.chain, toChain.chain);
+  }
+
   getDefaultOptions(): Op {
     return NttRoute.AutomaticOptions;
   }
 
-  async isAvailable(_: routes.RouteTransferRequest<N>): Promise<boolean> {
-    return true;
+  /** The Portal can be paused for sends independently of any path being registered. */
+  async isAvailable(request: routes.RouteTransferRequest<N>): Promise<boolean> {
+    try {
+      const { fromChain } = request;
+      const router =
+        chainToPlatform(fromChain.chain) === "Solana"
+          ? await SvmRouter.fromChainContext(fromChain)
+          : await EvmRouter.fromChainContext(fromChain);
+      return !(await router.isSendPaused());
+    } catch {
+      return false;
+    }
   }
 
   async validate(
     request: routes.RouteTransferRequest<N>,
     params: Tp,
   ): Promise<Vr> {
-    const options = params.options ?? this.getDefaultOptions();
+    try {
+      const options = params.options ?? this.getDefaultOptions();
 
-    const parsedAmount = amount.parse(params.amount, request.source.decimals);
-    // The trimmedAmount may differ from the parsedAmount if the parsedAmount includes dust
-    const trimmedAmount = NttRoute.trimAmount(
-      parsedAmount,
-      request.destination.decimals,
-    );
+      const sourceToken = canonicalAddress(request.source.id);
+      const destinationToken = canonicalAddress(request.destination.id);
 
-    const fromContracts = M0AutomaticRoute.getContracts(request.fromChain);
-    const toContracts = M0AutomaticRoute.getContracts(request.toChain);
+      // `Portal.sendToken` reverts with `UnsupportedBridgingPath` for anything it
+      // has not registered, and it does so after the spend approval has been
+      // signed. Refuse here instead.
+      const supported = await M0AutomaticRoute.isSupportedPath(
+        request.fromChain,
+        request.toChain,
+        sourceToken,
+        destinationToken,
+      );
+      if (!supported) {
+        return {
+          valid: false,
+          params,
+          error: new Error(
+            `Unsupported bridging path: ${request.fromChain.chain}:${sourceToken} -> ` +
+              `${request.toChain.chain}:${destinationToken}`,
+          ),
+        };
+      }
 
-    const validatedParams: Vp = {
-      amount: params.amount,
-      normalizedParams: {
-        amount: trimmedAmount,
-        sourceContracts: fromContracts,
-        destinationContracts: toContracts,
-        options: {
-          queue: false,
-          automatic: true,
+      const parsedAmount = amount.parse(params.amount, request.source.decimals);
+      // The trimmedAmount may differ from the parsedAmount if the parsedAmount includes dust
+      const trimmedAmount = NttRoute.trimAmount(
+        parsedAmount,
+        request.destination.decimals,
+      );
+
+      const fromContracts = M0AutomaticRoute.getContracts(request.fromChain);
+      const toContracts = M0AutomaticRoute.getContracts(request.toChain);
+
+      const validatedParams: Vp = {
+        amount: params.amount,
+        normalizedParams: {
+          amount: trimmedAmount,
+          sourceContracts: fromContracts,
+          destinationContracts: toContracts,
+          options: {
+            queue: false,
+            automatic: true,
+          },
         },
-      },
-      options,
-    };
-    return { valid: true, params: validatedParams };
+        options,
+      };
+      return { valid: true, params: validatedParams };
+    } catch (e) {
+      return { valid: false, params, error: e as Error };
+    }
   }
 
   async quote(

@@ -1,0 +1,147 @@
+#   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-  .-.-.   .-.-.   .-.-
+#  / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ / / \ \ / / \ \ / / \
+# `-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-'   `-`-'   `-`-'
+#
+#      Refreshes src/generated/supportedPaths.ts from live Portal state
+#
+#   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-.   .-.-  .-.-.   .-.-.   .-.-
+#  / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ \ / / \ / / \ \ / / \ \ / / \
+# `-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-`-'   `-'   `-`-'   `-`-'
+name: Update supported paths
+
+on:
+  schedule:
+    # 05:15 UTC daily — off the hour to avoid GitHub's scheduling peak.
+    - cron: "15 5 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Regenerate and show the diff without opening a PR"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NPM_TOKEN: ""
+
+jobs:
+  update:
+    name: Regenerate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Public RPCs are used for any chain without a secret. They are rate limited
+      # and often refuse wide getLogs ranges, which pushes those chains onto the
+      # probe fallback — set the secrets below for full log enumeration.
+      - name: Regenerate supported paths
+        run: pnpm generate:paths
+        env:
+          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          LINEA_RPC_URL: ${{ secrets.LINEA_RPC_URL }}
+          HYPER_EVM_RPC_URL: ${{ secrets.HYPER_EVM_RPC_URL }}
+          MONAD_RPC_URL: ${{ secrets.MONAD_RPC_URL }}
+          MOCA_RPC_URL: ${{ secrets.MOCA_RPC_URL }}
+          PLASMA_RPC_URL: ${{ secrets.PLASMA_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ARBITRUM_SEPOLIA_RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+          BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL }}
+          OPTIMISM_SEPOLIA_RPC_URL: ${{ secrets.OPTIMISM_SEPOLIA_RPC_URL }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          SOLANA_DEVNET_RPC_URL: ${{ secrets.SOLANA_DEVNET_RPC_URL }}
+
+      # The build is the real check on the generated file: it must typecheck
+      # against the Chain union of the pinned SDK version.
+      - name: Build
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      # Fails the run if what the SDK would offer differs from what the Portal
+      # accepts — the regenerated table is only useful if it is exact.
+      - name: Verify against on-chain state
+        run: pnpm verify:paths
+        env:
+          ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          LINEA_RPC_URL: ${{ secrets.LINEA_RPC_URL }}
+          HYPER_EVM_RPC_URL: ${{ secrets.HYPER_EVM_RPC_URL }}
+          MONAD_RPC_URL: ${{ secrets.MONAD_RPC_URL }}
+          MOCA_RPC_URL: ${{ secrets.MOCA_RPC_URL }}
+          PLASMA_RPC_URL: ${{ secrets.PLASMA_RPC_URL }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ARBITRUM_SEPOLIA_RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+          BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL }}
+          OPTIMISM_SEPOLIA_RPC_URL: ${{ secrets.OPTIMISM_SEPOLIA_RPC_URL }}
+
+      - name: Check for changes
+        id: diff
+        run: |
+          # GENERATED_AT changes on every run; only a path or token change matters.
+          if git diff --quiet -- src/generated/supportedPaths.ts; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$(git diff -U0 -- src/generated/supportedPaths.ts | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -v 'GENERATED_AT')" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Only the timestamp changed — discarding."
+            git checkout -- src/generated/supportedPaths.ts
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff -- src/generated/supportedPaths.ts
+          fi
+
+      - name: Add changeset
+        if: steps.diff.outputs.changed == 'true' && !inputs.dry_run
+        run: |
+          mkdir -p .changeset
+          cat > .changeset/supported-paths-refresh.md <<'EOF'
+          ---
+          "@m0-foundation/ntt-sdk-route": patch
+          ---
+
+          Refresh generated supported bridging paths from live Portal state.
+          EOF
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true' && !inputs.dry_run
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.CHANGESETS_GITHUB_TOKEN }}
+          branch: chore/update-supported-paths
+          base: main
+          commit-message: "chore: refresh generated supported bridging paths"
+          title: "chore: refresh generated supported bridging paths"
+          body: |
+            Regenerated `src/generated/supportedPaths.ts` from live Portal state.
+
+            Source of truth is the Portal itself — `SupportedBridgingPathSet` logs on
+            EVM, `ChainBridgePaths` accounts on Solana. This file is generated; do not
+            hand-edit it. Review the diff for paths that were added or removed on-chain.
+
+            Check the job log for warnings: chains whose RPC would not serve a full log
+            history fall back to probing and can only find tokens already seen
+            elsewhere, and destinations with no Wormhole chain in the pinned SDK version
+            are dropped.
+          delete-branch: true
+          add-paths: |
+            src/generated/supportedPaths.ts
+            .changeset/supported-paths-refresh.md

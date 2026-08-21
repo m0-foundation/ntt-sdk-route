@@ -23,7 +23,9 @@
   "scripts": {
     "build": "$npm_execpath tsup --clean",
     "clean": "rm -rf dist",
-    "test-bridge": "node --env-file=.env -r ts-node/register scripts/bridge.ts"
+    "test-bridge": "node --env-file=.env -r ts-node/register scripts/bridge.ts",
+    "generate:paths": "ts-node scripts/fetch-supported-paths.ts",
+    "verify:paths": "ts-node scripts/verify-paths.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",

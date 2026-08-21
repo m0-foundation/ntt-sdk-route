@@ -12,6 +12,7 @@ export function getM0ChainId(chain: Chain, network: Network): number {
     Avalanche: 43114,
     Base: 8453,
     Berachain: 80094,
+    Bsc: 56,
     Ethereum: 1,
     HyperEVM: 999,
     Ink: 57073,
