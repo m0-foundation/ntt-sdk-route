@@ -40,7 +40,11 @@ type extensionToken = {
 };
 
 export class SvmRouter {
-  private static instance: SvmRouter | null = null;
+  /**
+   * One router per (network, chain) — a bare singleton would let a Mainnet and a
+   * Testnet instance share the same connection and cached path table.
+   */
+  private static instances = new Map<string, SvmRouter>();
   static evmPeer = "0xaCffEC28C4eEe21C889a4e6C0704c540Ed9D4fDd";
 
   constructor(
@@ -56,15 +60,46 @@ export class SvmRouter {
       throw new Error(`Unsupported svm chain: ${ctx.chain}`);
     }
 
-    if (!SvmRouter.instance) {
-      SvmRouter.instance = new SvmRouter(
+    const key = `${ctx.network}:${ctx.chain}`;
+    let instance = SvmRouter.instances.get(key);
+    if (!instance) {
+      instance = new SvmRouter(
         await ctx.getRpc(),
         ctx.chain,
         ctx.network as Exclude<Network, "Devnet">,
       );
+      SvmRouter.instances.set(key, instance);
     }
 
-    return SvmRouter.instance;
+    return instance;
+  }
+
+  /** True when the Portal program has outgoing transfers paused. */
+  async isSendPaused(): Promise<boolean> {
+    try {
+      const program = svmPortalProvider(this.connection);
+      const global = await program.account.portalGlobal.fetch(
+        PublicKey.findProgramAddressSync(
+          [Buffer.from("global")],
+          program.programId,
+        )[0],
+      );
+      return Boolean(global.outgoingPaused);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Whether the Portal has this exact path registered. */
+  async isSupportedPath(
+    sourceToken: string,
+    toChain: Chain,
+    destinationToken: string,
+  ): Promise<boolean> {
+    const destinations = await this.getSupportedDestinationTokens(sourceToken, toChain);
+    return destinations.some(
+      (token) => token.address.toString().toLowerCase() === destinationToken.toLowerCase(),
+    );
   }
 
   async buildSendTokenInstruction(
